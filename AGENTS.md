@@ -2,6 +2,8 @@
 
 本文档总结项目架构信息和模块关系，便于后续迭代开发。
 
+**要求：每当新特性、新架构等能力补充时，必须完善`AGENTS.md`以及`README.md`文档**
+
 ## 项目概述
 
 Agent VCR 是一个为 opencode Agent 工程提供单元测试能力的 TypeScript CLI 工具。
