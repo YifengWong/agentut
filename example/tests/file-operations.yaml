@@ -1,0 +1,57 @@
+name: file-operations-test
+description: 验证文件操作 Skill 的基本行为
+
+environments:
+  empty:
+    directory: ./fixtures/empty
+    setup: []
+
+  with-hello:
+    directory: ./fixtures/with-hello
+    setup:
+      - copy: ./fixtures/templates/hello
+
+scenarios:
+  # 场景 1：创建文件（验证 Write + 文件产生）
+  - name: create-file
+    environment: empty
+    cleanup: true
+    steps:
+      - input: "创建 hello.txt 文件，内容为 'Hello World'"
+        expected:
+          - should_call_tool: Write
+          - should_produce_file: hello.txt
+          - file_content_contains:
+              file: hello.txt
+              text: "Hello World"
+        timeout: 30000
+
+  # 场景 2：读取文件（验证 Read + 响应内容）
+  - name: read-file
+    environment: with-hello
+    cleanup: true
+    steps:
+      - input: "读取 hello.txt 文件内容"
+        expected:
+          - should_call_tool: Read
+          - response_contains: "Hello"
+        timeout: 30000
+
+  # 场景 3：多步骤串联（先创建再读取）
+  - name: create-then-read
+    environment: empty
+    cleanup: true
+    steps:
+      - input: "创建 hello.txt 文件，内容为 'Test Content'"
+        expected:
+          - should_call_tool: Write
+          - should_produce_file: hello.txt
+
+      - input: "读取 hello.txt 文件"
+        expected:
+          - should_call_tool: Read
+          - response_contains: "Test Content"
+
+config:
+  default_timeout: 60000
+  parallel: false
