@@ -40,6 +40,20 @@ agentvcr suggest --latest -o ./tests/my-test.yaml
 agentvcr suggest ses_xxx -o ./tests/my-test.yaml
 ```
 
+## 示例
+
+项目包含示例 Skill 和测试用例，位于 `example/` 目录：
+
+```bash
+# 运行示例测试
+agentvcr run ./example/tests/file-operations.yaml
+```
+
+示例覆盖：
+- 创建文件（Write 工具 + 文件断言）
+- 读取文件（Read 工具 + 响应断言）
+- 多步骤串联（步骤间会话保持）
+
 ## 测试用例格式
 
 测试用例使用 YAML 格式定义：

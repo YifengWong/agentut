@@ -39,6 +39,14 @@ cli/
 ├── tests/                        # 单元测试目录
 ├── SKILL.md                      # Skill 描述文档
 ├── README.md                     # 用户使用文档
+├── example/                      # 示例 Skill 和测试用例
+│   ├── skills/
+│   │   └── file-operations.md   # 示例 Skill 定义
+│   ├── fixtures/
+│   │   ├── templates/           # 测试模板文件
+│   │   └── empty/               # 空环境目录
+│   └── tests/
+│       └── file-operations.yaml # 示例测试用例
 └── package.json
 ```
 
