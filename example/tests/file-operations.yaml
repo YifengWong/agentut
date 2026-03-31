@@ -9,7 +9,7 @@ environments:
   with-hello:
     directory: ./fixtures/with-hello
     setup:
-      - copy: ./fixtures/templates/hello
+      - copy: ../fixtures/templates/hello.txt
 
 scenarios:
   # 场景 1：创建文件（验证 Write + 文件产生）
