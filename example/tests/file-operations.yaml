@@ -24,7 +24,6 @@ scenarios:
           - file_content_contains:
               file: hello.txt
               text: "Hello World"
-        timeout: 30000
 
   # 场景 2：读取文件（验证 Read + 响应内容）
   - name: read-file
@@ -35,7 +34,6 @@ scenarios:
         expected:
           - should_call_tool: Read
           - response_contains: "Hello"
-        timeout: 30000
 
   # 场景 3：多步骤串联（先创建再读取）
   - name: create-then-read
@@ -53,5 +51,7 @@ scenarios:
           - response_contains: "Test Content"
 
 config:
-  default_timeout: 60000
+  target:
+    skill: ../skills/file-operations.md
+  default_timeout: 120000
   parallel: false

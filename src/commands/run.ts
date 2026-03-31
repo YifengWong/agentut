@@ -48,7 +48,7 @@ export async function runTests(
 
   // Execute scenarios
   const scenarioResults: ScenarioResult[] = [];
-  const tempRoot = path.join(yamlDirectory, '.agentvcr', 'temp');
+  const tempRoot = path.resolve(yamlDirectory, '.agentvcr', 'temp');
 
   for (const scenario of scenarios) {
     const result = await executeScenario(suite, scenario, yamlDirectory, tempRoot, {
@@ -85,12 +85,22 @@ async function executeScenario(
 
   // Get model and agent from options or config
   const model = options?.model || suite.config?.target?.model;
-  const agent = options?.agent || suite.config?.target?.agent;
+  const skill = suite.config?.target?.skill;
+
+  // Derive agent name from skill file name (without .md extension)
+  let agent = options?.agent || suite.config?.target?.agent;
+  if (!agent && skill) {
+    const skillFileName = path.basename(skill, '.md');
+    agent = skillFileName;
+  }
 
   try {
     // Prepare environment
     const envConfig = suite.environments[scenario.environment];
-    const envResult = await prepareEnvironment(envConfig, scenario.name, tempRoot, yamlDirectory);
+    const envResult = await prepareEnvironment(envConfig, scenario.name, tempRoot, {
+      yamlDirectory,
+      skill
+    });
     tempDirectory = envResult.tempDirectory;
 
     // Execute steps

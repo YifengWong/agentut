@@ -9,9 +9,18 @@ export function verifyShouldCallTool(
   outputs: OpenCodeRunOutput[],
   toolName: string
 ): AssertionResult {
-  const toolCalls = outputs.filter(
-    output => output.type === 'tool_call' && output.data?.tool_name === toolName
-  );
+  // Check both new format (part.tool) and legacy format (data.tool_name)
+  const toolCalls = outputs.filter(output => {
+    // New format: type: "tool_use", part.tool
+    if (output.part?.tool) {
+      return output.part.tool.toLowerCase() === toolName.toLowerCase();
+    }
+    // Legacy format: type: "tool_call", data.tool_name
+    if (output.data?.tool_name) {
+      return output.data.tool_name === toolName;
+    }
+    return false;
+  });
 
   if (toolCalls.length > 0) {
     return {
@@ -120,11 +129,29 @@ export function verifyResponseContains(
   outputs: OpenCodeRunOutput[],
   text: string
 ): AssertionResult {
-  const textOutputs = outputs.filter(output => output.type === 'text');
+  // Check both new format (part.text) and legacy format (data.content)
+  const textOutputs = outputs.filter(output => {
+    // New format: type: "text", part.text
+    if (output.type === 'text' && output.part?.text) {
+      return true;
+    }
+    // Legacy format: type: "text", data.content
+    if (output.data?.content) {
+      return true;
+    }
+    return false;
+  });
 
   const found = textOutputs.some(output => {
-    const content = output.data?.content || '';
-    return content.includes(text);
+    // New format
+    if (output.part?.text) {
+      return output.part.text.includes(text);
+    }
+    // Legacy format
+    if (output.data?.content) {
+      return output.data.content.includes(text);
+    }
+    return false;
   });
 
   if (found) {

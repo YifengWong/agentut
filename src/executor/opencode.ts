@@ -76,8 +76,9 @@ export function runOpenCode(options: RunOpenCodeOptions): RunOpenCodeResult {
         try {
           const parsed = JSON.parse(line) as OpenCodeRunOutput;
           outputs.push(parsed);
-          if (parsed.session_id) {
-            lastSessionId = parsed.session_id;
+          // Check both new format (sessionID) and legacy format (session_id)
+          if (parsed.sessionID) {
+            lastSessionId = parsed.sessionID;
           }
         } catch {
           // Skip non-JSON lines

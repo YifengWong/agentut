@@ -174,8 +174,23 @@ export interface AssertionResult {
 // ========== OpenCode Output Types ==========
 
 export interface OpenCodeRunOutput {
-  type: 'message' | 'tool_call' | 'tool_result' | 'text' | 'error';
-  data: {
+  type: string;
+  timestamp?: number;
+  sessionID?: string;
+  part?: {
+    type?: string;
+    text?: string;
+    tool?: string;
+    callID?: string;
+    state?: {
+      status?: string;
+      input?: Record<string, unknown>;
+      output?: string;
+      error?: string;
+    };
+  };
+  // Legacy format support
+  data?: {
     role?: 'user' | 'assistant';
     content?: string;
     tool_name?: string;
@@ -184,8 +199,6 @@ export interface OpenCodeRunOutput {
     success?: boolean;
     error?: string;
   };
-  session_id: string;
-  timestamp: number;
 }
 
 // ========== Execution Context Types ==========
