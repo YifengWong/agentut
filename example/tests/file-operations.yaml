@@ -3,11 +3,11 @@ description: 验证文件操作 Skill 的基本行为
 
 environments:
   empty:
-    directory: ./fixtures/empty
+    directory: ../fixtures/empty
     setup: []
 
   with-hello:
-    directory: ./fixtures/with-hello
+    directory: ../fixtures/with-hello
     setup:
       - copy: ../fixtures/templates/hello.txt
 
