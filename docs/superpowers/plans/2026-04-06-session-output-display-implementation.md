@@ -499,6 +499,44 @@ cd D:/Projects/agentvcr && node dist/cli.js run ./example/tests/file-operations.
 
 ---
 
+### Task 6: 更新 README.md 文档
+
+**Files:**
+- Modify: `README.md`
+
+- [ ] **Step 1: 在输出格式部分添加会话内容说明**
+
+在 README.md 的 `## 输出格式` 部分之后添加：
+
+```markdown
+### 会话内容展示
+
+使用 `--verbose` 参数时，markdown 和 html 格式的测试报告会包含完整的会话内容：
+
+- **Request**: 用户的输入请求
+- **Response**: Agent 的文本响应
+- **Tool Calls**: 工具调用列表（工具名、状态、输入参数）
+- **Raw Output**: 原始 JSON 输出（折叠显示）
+
+示例：
+
+\`\`\`bash
+agentvcr run ./tests/ --verbose -f markdown -o report.md
+agentvcr run ./tests/ --verbose -f html -o report.html
+\`\`\`
+```
+
+- [ ] **Step 2: 提交**
+
+```bash
+git add README.md
+git commit -m "docs: update README with session output display feature
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+```
+
+---
+
 ## 验证清单
 
 - [ ] 单元测试全部通过
@@ -506,3 +544,4 @@ cd D:/Projects/agentvcr && node dist/cli.js run ./example/tests/file-operations.
 - [ ] HTML 报告包含格式化的会话内容卡片
 - [ ] HTML 正确转义特殊字符
 - [ ] 错误状态正确显示 ✗ error
+- [ ] README.md 已更新会话内容展示说明
