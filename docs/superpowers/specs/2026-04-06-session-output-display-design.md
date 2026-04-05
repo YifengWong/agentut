@@ -172,217 +172,41 @@ function formatStep(step: StepResult, index: number): string {
 #### Test Fixtures
 
 ```typescript
-// 完整的会话输出 mock 数据
+// 完整会话输出（含文本响应 + 工具调用）
 const mockSessionOutput: OpenCodeRunOutput[] = [
-  {
-    type: 'step_start',
-    timestamp: 1744000000000,
-    sessionID: 'ses_test123',
-    part: { type: 'step-start' }
-  },
-  {
-    type: 'text',
-    timestamp: 1744000001000,
-    sessionID: 'ses_test123',
-    part: {
-      type: 'text',
-      text: '好的，我来帮你创建这个文件。'
-    }
-  },
-  {
-    type: 'tool_use',
-    timestamp: 1744000002000,
-    sessionID: 'ses_test123',
-    part: {
-      tool: 'write',
-      callID: 'call_001',
-      state: {
-        status: 'completed',
-        input: {
-          filePath: '/tmp/hello.txt',
-          content: 'Hello World'
-        },
-        output: 'Wrote file successfully.'
-      }
-    }
-  },
-  {
-    type: 'tool_use',
-    timestamp: 1744000003000,
-    sessionID: 'ses_test123',
-    part: {
-      tool: 'read',
-      callID: 'call_002',
-      state: {
-        status: 'completed',
-        input: {
-          filePath: '/tmp/hello.txt'
-        },
-        output: '<content>Hello World</content>'
-      }
-    }
-  },
-  {
-    type: 'text',
-    timestamp: 1744000004000,
-    sessionID: 'ses_test123',
-    part: {
-      type: 'text',
-      text: '文件已成功创建并验证，内容为 "Hello World"。'
-    }
-  },
-  {
-    type: 'step_finish',
-    timestamp: 1744000005000,
-    sessionID: 'ses_test123',
-    part: { type: 'step-finish', reason: 'stop' }
-  }
+  { type: 'text', part: { text: '好的，我来帮你创建这个文件。' } },
+  { type: 'tool_use', part: { tool: 'write', state: {
+    status: 'completed',
+    input: { filePath: '/tmp/hello.txt', content: 'Hello World' }
+  }}},
+  { type: 'tool_use', part: { tool: 'read', state: {
+    status: 'completed',
+    input: { filePath: '/tmp/hello.txt' }
+  }}},
+  { type: 'text', part: { text: '文件已成功创建。' } }
 ];
 
-// 包含工具调用错误的 mock 数据
-const mockSessionOutputWithError: OpenCodeRunOutput[] = [
-  {
-    type: 'tool_use',
-    timestamp: 1744000001000,
-    sessionID: 'ses_test456',
-    part: {
-      tool: 'read',
-      callID: 'call_001',
-      state: {
-        status: 'error',
-        input: { filePath: '/nonexistent.txt' },
-        error: 'File not found: /nonexistent.txt'
-      }
-    }
-  }
+// 工具调用错误
+const mockErrorOutput: OpenCodeRunOutput[] = [
+  { type: 'tool_use', part: { tool: 'read', state: {
+    status: 'error',
+    input: { filePath: '/nonexistent.txt' },
+    error: 'File not found'
+  }}}
 ];
-
-// 空输出
-const mockEmptyOutput: OpenCodeRunOutput[] = [];
 ```
 
 #### Test Cases
 
-```typescript
-describe('formatSessionOutput (Markdown)', () => {
-  it('should format complete session with text and tool calls', () => {
-    const result = formatSessionOutputMarkdown(mockSessionOutput, '创建 hello.txt 文件');
+| 场景 | 输入 | 预期输出 |
+|------|------|----------|
+| 完整会话（Markdown） | mockSessionOutput, request="创建文件" | 包含 Request/Response/Tool Calls 表格，状态 ✓ completed |
+| 完整会话（HTML） | mockSessionOutput, request="创建文件" | 包含 `<div class="step-session">` 结构，表格含工具调用 |
+| 工具错误 | mockErrorOutput | 状态显示 ✗ error，包含错误信息 |
+| 空输出 | [] | 返回空字符串 |
+| HTML 转义 | text 含 `<script>` | 输出中 `<` 转义为 `&lt;` |
 
-    expect(result).toContain('**Request:**');
-    expect(result).toContain('创建 hello.txt 文件');
-    expect(result).toContain('**Response:**');
-    expect(result).toContain('好的，我来帮你创建这个文件。');
-    expect(result).toContain('文件已成功创建并验证');
-    expect(result).toContain('**Tool Calls:**');
-    expect(result).toContain('| write | ✓ completed |');
-    expect(result).toContain('| read | ✓ completed |');
-    expect(result).toContain('filePath: `/tmp/hello.txt`');
-    expect(result).toContain('content: `Hello World`');
-  });
-
-  it('should format tool call with error status', () => {
-    const result = formatSessionOutputMarkdown(mockSessionOutputWithError, '读取文件');
-
-    expect(result).toContain('| read | ✗ error |');
-    expect(result).toContain('File not found');
-  });
-
-  it('should return empty string for empty output', () => {
-    const result = formatSessionOutputMarkdown(mockEmptyOutput, 'test');
-
-    expect(result).toBe('');
-  });
-
-  it('should include raw output in collapsible section', () => {
-    const result = formatSessionOutputMarkdown(mockSessionOutput, 'test');
-
-    expect(result).toContain('<details>');
-    expect(result).toContain('<summary>Raw Output</summary>');
-    expect(result).toContain('```json');
-  });
-});
-
-describe('formatSessionOutput (HTML)', () => {
-  it('should format complete session with proper HTML structure', () => {
-    const result = formatSessionOutputHtml(mockSessionOutput, '创建 hello.txt 文件');
-
-    expect(result).toContain('<div class="step-session">');
-    expect(result).toContain('<div class="request">');
-    expect(result).toContain('<div class="response">');
-    expect(result).toContain('<div class="tool-calls">');
-    expect(result).toContain('<table>');
-    expect(result).toContain('<td>write</td>');
-    expect(result).toContain('✓ completed');
-  });
-
-  it('should escape HTML special characters in content', () => {
-    const outputWithHtml: OpenCodeRunOutput[] = [
-      {
-        type: 'text',
-        part: { text: 'Test <script>alert("xss")</script>' }
-      }
-    ];
-    const result = formatSessionOutputHtml(outputWithHtml, 'test');
-
-    expect(result).toContain('&lt;script&gt;');
-    expect(result).not.toContain('<script>');
-  });
-
-  it('should format error status with appropriate styling', () => {
-    const result = formatSessionOutputHtml(mockSessionOutputWithError, '读取文件');
-
-    expect(result).toContain('✗ error');
-    expect(result).toContain('File not found');
-  });
-
-  it('should return empty string for empty output', () => {
-    const result = formatSessionOutputHtml(mockEmptyOutput, 'test');
-
-    expect(result).toBe('');
-  });
-});
-
-describe('extractTextResponses', () => {
-  it('should extract all text responses in order', () => {
-    const texts = extractTextResponses(mockSessionOutput);
-
-    expect(texts).toHaveLength(2);
-    expect(texts[0]).toBe('好的，我来帮你创建这个文件。');
-    expect(texts[1]).toBe('文件已成功创建并验证，内容为 "Hello World"。');
-  });
-
-  it('should return empty array when no text responses', () => {
-    const texts = extractTextResponses(mockSessionOutputWithError);
-
-    expect(texts).toHaveLength(0);
-  });
-});
-
-describe('extractToolCalls', () => {
-  it('should extract all tool calls with complete input', () => {
-    const toolCalls = extractToolCalls(mockSessionOutput);
-
-    expect(toolCalls).toHaveLength(2);
-    expect(toolCalls[0].tool).toBe('write');
-    expect(toolCalls[0].status).toBe('completed');
-    expect(toolCalls[0].input).toEqual({
-      filePath: '/tmp/hello.txt',
-      content: 'Hello World'
-    });
-    expect(toolCalls[1].tool).toBe('read');
-  });
-
-  it('should extract error information', () => {
-    const toolCalls = extractToolCalls(mockSessionOutputWithError);
-
-    expect(toolCalls).toHaveLength(1);
-    expect(toolCalls[0].status).toBe('error');
-    expect(toolCalls[0].error).toBe('File not found: /nonexistent.txt');
-  });
-});
-```
-
-#### Running Unit Tests
+#### Running Tests
 
 ```bash
 npm test -- tests/output/formatters/session-output.test.ts
