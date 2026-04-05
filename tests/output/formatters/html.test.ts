@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { formatAsHtml } from '../../../src/output/formatters/html.js';
-import type { TestResult } from '../../../src/types/index.js';
+import { formatAsHtml, formatSessionOutputHtml } from '../../../src/output/formatters/html.js';
+import type { TestResult, OpenCodeRunOutput } from '../../../src/types/index.js';
 
 describe('formatAsHtml', () => {
   it('should generate complete HTML document', () => {
@@ -89,5 +89,65 @@ describe('formatAsHtml', () => {
     const html = formatAsHtml(result);
 
     expect(html).toContain('width=device-width');
+  });
+});
+
+// Test fixtures for formatSessionOutputHtml
+const mockSessionOutput: OpenCodeRunOutput[] = [
+  { type: 'text', part: { text: '好的，我来帮你创建这个文件。' } },
+  { type: 'tool_use', part: { tool: 'write', state: {
+    status: 'completed',
+    input: { filePath: '/tmp/hello.txt', content: 'Hello World' }
+  }}}
+];
+
+const mockErrorOutput: OpenCodeRunOutput[] = [
+  { type: 'tool_use', part: { tool: 'read', state: {
+    status: 'error',
+    input: { filePath: '/nonexistent.txt' },
+    error: 'File not found'
+  }}}
+];
+
+describe('formatSessionOutputHtml', () => {
+  it('should format complete session with proper HTML structure', () => {
+    const result = formatSessionOutputHtml(mockSessionOutput, '创建文件');
+    expect(result).toContain('<div class="step-session">');
+    expect(result).toContain('<div class="session-request">');
+    expect(result).toContain('<div class="session-response">');
+    expect(result).toContain('<div class="session-tool-calls">');
+    expect(result).toContain('<td>write</td>');
+    expect(result).toContain('✓ completed');
+  });
+
+  it('should escape HTML special characters', () => {
+    const output: OpenCodeRunOutput[] = [
+      { type: 'text', part: { text: 'Test <script>alert("xss")</script>' } }
+    ];
+    const result = formatSessionOutputHtml(output, 'test');
+    expect(result).toContain('&lt;script&gt;');
+    expect(result).not.toContain('<script>');
+  });
+
+  it('should format error status', () => {
+    const result = formatSessionOutputHtml(mockErrorOutput, '读取文件');
+    expect(result).toContain('✗ error');
+    expect(result).toContain('File not found');
+  });
+
+  it('should return empty string for empty output', () => {
+    const result = formatSessionOutputHtml([], 'test');
+    expect(result).toBe('');
+  });
+
+  it('should return empty string for undefined input', () => {
+    const result = formatSessionOutputHtml(undefined, 'test');
+    expect(result).toBe('');
+  });
+
+  it('should include raw output in collapsible details', () => {
+    const result = formatSessionOutputHtml(mockSessionOutput, 'test');
+    expect(result).toContain('<details class="session-raw">');
+    expect(result).toContain('<summary>Raw Output</summary>');
   });
 });
