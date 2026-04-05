@@ -7,6 +7,10 @@ interface ToolCallInfo {
   error?: string;
 }
 
+function escapeMarkdownTableCell(str: string): string {
+  return str.replace(/\|/g, '\\|').replace(/\n/g, ' ');
+}
+
 function extractTextResponses(outputs: OpenCodeRunOutput[]): string[] {
   return outputs
     .filter(output => output.type === 'text' && output.part?.text)
@@ -59,10 +63,10 @@ export function formatSessionOutputMarkdown(
     for (const tc of toolCalls) {
       const statusIcon = tc.status === 'completed' ? '✓' : '✗';
       const inputStr = Object.entries(tc.input)
-        .map(([k, v]) => `${k}: \`${String(v).replace(/\n/g, ' ')}\``)
+        .map(([k, v]) => `${k}: \`${escapeMarkdownTableCell(String(v))}\``)
         .join('<br>');
-      const errorStr = tc.error ? `<br>**Error:** ${tc.error}` : '';
-      lines.push(`| ${tc.tool} | ${statusIcon} ${tc.status} | ${inputStr}${errorStr} |`);
+      const errorStr = tc.error ? `<br>**Error:** ${escapeMarkdownTableCell(tc.error)}` : '';
+      lines.push(`| ${escapeMarkdownTableCell(tc.tool)} | ${statusIcon} ${tc.status} | ${inputStr}${errorStr} |`);
     }
     lines.push('');
   }
