@@ -176,4 +176,38 @@ describe('formatSessionOutputMarkdown', () => {
     const result = formatSessionOutputMarkdown(output, 'test');
     expect(result).toContain('file\\|name.txt');
   });
+
+  it('should return empty string for undefined input', () => {
+    const result = formatSessionOutputMarkdown(undefined, 'test');
+    expect(result).toBe('');
+  });
+
+  it('should format multiline text responses with quote prefix', () => {
+    const output: OpenCodeRunOutput[] = [
+      { type: 'text', part: { text: 'Line 1\nLine 2\nLine 3' } }
+    ];
+    const result = formatSessionOutputMarkdown(output, 'test');
+    expect(result).toContain('> Line 1');
+    expect(result).toContain('> Line 2');
+    expect(result).toContain('> Line 3');
+  });
+
+  it('should include raw output in collapsible section', () => {
+    const result = formatSessionOutputMarkdown(mockSessionOutput, 'test');
+    expect(result).toContain('<details>');
+    expect(result).toContain('<summary>Raw Output</summary>');
+    expect(result).toContain('```json');
+  });
+
+  it('should escape newlines in table cells', () => {
+    const output: OpenCodeRunOutput[] = [
+      { type: 'tool_use', part: { tool: 'test', state: {
+        status: 'completed',
+        input: { text: 'line1\nline2' }
+      }}}
+    ];
+    const result = formatSessionOutputMarkdown(output, 'test');
+    expect(result).toContain('line1 line2');
+    expect(result).not.toContain('line1\nline2');
+  });
 });
