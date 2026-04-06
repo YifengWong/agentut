@@ -341,7 +341,7 @@ describe('run command', () => {
       await runTests(yamlPath);
 
       expect(logger.error).toHaveBeenCalledWith('error-scenario', 'Execution failed');
-      expect(logger.endStep).toHaveBeenCalledWith('error-scenario', false, 1, 1, 60000);
+      expect(logger.endStep).toHaveBeenCalledWith('error-scenario', false, 1, 1, expect.any(Number));
     });
 
     it('should call logger.summary with correct passed/failed counts', async () => {

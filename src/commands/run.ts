@@ -194,7 +194,7 @@ async function executeScenario(
         // Log step end
         logger.endStep(scenario.name, stepPassed, stepNumber, totalSteps, stepDuration);
       } catch (err) {
-        const stepDuration = step.timeout || 60000;
+        const stepDuration = Date.now() - stepStartTime;
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
 
         const stepResult: StepResult = {
