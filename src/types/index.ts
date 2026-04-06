@@ -14,8 +14,9 @@ export interface EnvironmentConfig {
 }
 
 export interface SetupAction {
-  copy?: string;
+  copy?: string;   // "source -> target" 格式，target 支持 $WORKDIR
   run?: string;
+  agent?: string;  // 可选，显式指定 agent 名称
 }
 
 export interface ScenarioConfig {
@@ -38,11 +39,6 @@ export type Assertion =
   | { response_contains: string };
 
 export interface GlobalConfig {
-  target?: {
-    skill?: string;
-    agent?: string;
-    model?: string;
-  };
   default_timeout?: number;
   parallel?: boolean;
 }
