@@ -19,10 +19,15 @@ scenarios:
     environment: empty
     cleanup: true
     steps:
-      - input: "创建 hello.txt 文件，内容为 'Hello World'，必须使用技能完成。"
+      - input: "使用 'file-operations' 技能，创建 hello.txt 文件，内容为 'Hello World'。"
         expected:
           - should_call_tool: Write
           - should_produce_file: hello.txt
+          - should_call_tool:
+              name: Skill
+              input:
+                name: file-operations
+              status: completed
           - file_content_contains:
               file: hello.txt
               text: "Hello World"
@@ -32,9 +37,14 @@ scenarios:
     environment: with-hello
     cleanup: true
     steps:
-      - input: "读取 hello.txt 文件内容"
+      - input: "使用 'file-operations' 技能，读取 hello.txt 文件内容"
         expected:
           - should_call_tool: Read
+          - should_call_tool:
+              name: Skill
+              input:
+                name: { equals: "file-operations" }
+              status: completed
           - response_contains: "Hello"
 
   # 场景 3：多步骤串联（先创建再读取）
@@ -46,6 +56,11 @@ scenarios:
         expected:
           - should_call_tool: Write
           - should_produce_file: hello.txt
+          - should_call_tool:
+              name: Skill
+              input:
+                name: { equals: "file-operations" }
+              status: completed
 
       - input: "读取 hello.txt 文件"
         expected:
