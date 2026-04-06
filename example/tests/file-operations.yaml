@@ -4,12 +4,14 @@ description: 验证文件操作 Skill 的基本行为
 environments:
   empty:
     directory: ../fixtures/empty
-    setup: []
+    setup:
+      - copy: "../skills/file-operations.md -> $WORKDIR/.opencode/agents/"
 
   with-hello:
     directory: ../fixtures/with-hello
     setup:
-      - copy: ../fixtures/templates/hello.txt
+      - copy: "../fixtures/templates/hello.txt -> $WORKDIR/hello.txt"
+      - copy: "../skills/file-operations.md -> $WORKDIR/.opencode/agents/"
 
 scenarios:
   # 场景 1：创建文件（验证 Write + 文件产生）
@@ -17,7 +19,7 @@ scenarios:
     environment: empty
     cleanup: true
     steps:
-      - input: "创建 hello.txt 文件，内容为 'Hello World'"
+      - input: "创建 hello.txt 文件，内容为 'Hello World'，必须使用技能完成。"
         expected:
           - should_call_tool: Write
           - should_produce_file: hello.txt
@@ -40,7 +42,7 @@ scenarios:
     environment: empty
     cleanup: true
     steps:
-      - input: "创建 hello.txt 文件，内容为 'Test Content'"
+      - input: "使用 'file-operations' 技能，创建 hello.txt 文件，内容为 'Test Content'"
         expected:
           - should_call_tool: Write
           - should_produce_file: hello.txt
@@ -51,7 +53,5 @@ scenarios:
           - response_contains: "Test Content"
 
 config:
-  target:
-    skill: ../skills/file-operations.md
   default_timeout: 120000
   parallel: false
