@@ -135,18 +135,21 @@ export function verifyShouldCallTool(
 
     // Legacy format (type: "tool_call", data.tool_name)
     if (output.type === 'tool_call' && output.data?.tool_name) {
-      const tool = output.data.tool_name.toLowerCase();
-      const expectedName = typeof toolAssertion.name === 'string'
-        ? toolAssertion.name.toLowerCase()
-        : toolAssertion.name;
-
       // Legacy format doesn't support input/status matching
-      // Only match on name, and only for simple string assertions
       if (toolAssertion.input || toolAssertion.status) {
         return false;
       }
 
-      return matchValue(tool, expectedName);
+      // For string assertions, use case-insensitive matching
+      // For Matcher objects, match against original value (case-sensitive)
+      if (typeof toolAssertion.name === 'string') {
+        const tool = output.data.tool_name.toLowerCase();
+        const expectedName = toolAssertion.name.toLowerCase();
+        return matchValue(tool, expectedName);
+      }
+
+      // Matcher objects expect the original value for proper matching
+      return matchValue(output.data.tool_name, toolAssertion.name);
     }
 
     return false;
