@@ -39,13 +39,13 @@ environments:
   env1:
     directory: ./test
     setup:
-      - copy: ./templates/base
+      - copy: "./templates/base -> $WORKDIR/"
       - run: npm install
 scenarios: []
 `;
     const result = parseYaml(yaml);
     expect(result.environments.env1.setup).toHaveLength(2);
-    expect(result.environments.env1.setup[0]).toEqual({ copy: './templates/base' });
+    expect(result.environments.env1.setup[0]).toEqual({ copy: './templates/base -> $WORKDIR/' });
     expect(result.environments.env1.setup[1]).toEqual({ run: 'npm install' });
   });
 
