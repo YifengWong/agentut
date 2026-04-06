@@ -220,6 +220,48 @@ describe('validateYamlTestSuite', () => {
     validateYamlTestSuite(suite);
     expect(suite.scenarios[0].steps[0].timeout).toBe(60000);
   });
+
+  it('should throw ValidationError for setup.copy without -> separator', () => {
+    const suite: YamlTestSuite = {
+      name: 'test',
+      environments: {
+        default: {
+          directory: './test',
+          setup: [
+            { copy: './templates/base' }  // 缺少 -> 分隔符
+          ]
+        }
+      },
+      scenarios: [{
+        name: 'scenario-1',
+        environment: 'default',
+        cleanup: true,
+        steps: []
+      }]
+    };
+    expect(() => validateYamlTestSuite(suite)).toThrow(ValidationError);
+  });
+
+  it('should pass for valid setup.copy with -> separator', () => {
+    const suite: YamlTestSuite = {
+      name: 'test',
+      environments: {
+        default: {
+          directory: './test',
+          setup: [
+            { copy: './templates/base -> $WORKDIR/' }
+          ]
+        }
+      },
+      scenarios: [{
+        name: 'scenario-1',
+        environment: 'default',
+        cleanup: true,
+        steps: []
+      }]
+    };
+    expect(() => validateYamlTestSuite(suite)).not.toThrow();
+  });
 });
 
 describe('parseAndValidateYaml', () => {

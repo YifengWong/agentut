@@ -46,6 +46,16 @@ export function validateYamlTestSuite(suite: YamlTestSuite): void {
         `environments.${envName}.setup`
       );
     }
+
+    // Validate setup.copy format
+    for (const action of envConfig.setup) {
+      if (action.copy && !action.copy.includes('->')) {
+        throw new ValidationError(
+          `setup.copy must use "source -> target" format: ${action.copy}`,
+          `environments.${envName}.setup.copy`
+        );
+      }
+    }
   }
 
   // Validate scenarios
