@@ -1,0 +1,26 @@
+name: matcher-example-test
+description: 验证 Matcher 模式断言功能
+
+environments:
+  empty:
+    directory: ../fixtures/empty
+    setup:
+      - copy: "../skills/file-operations/ -> $WORKDIR/.opencode/skills/file-operations/"
+
+scenarios:
+  - name: matcher-backward-compat
+    environment: empty
+    cleanup: true
+    steps:
+      - input: "创建 hello.txt 文件"
+        expected:
+          # 向后兼容格式
+          - should_call_tool: Write
+          # Matcher 格式
+          - should_produce_file: { regex: ".*\\.txt$" }
+          - file_content_contains:
+              file: { contains: "hello" }
+              text: { contains: "" }
+
+config:
+  default_timeout: 120000
