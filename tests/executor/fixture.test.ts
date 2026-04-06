@@ -6,9 +6,10 @@ import {
   copyEnvironment,
   executeSetup,
   cleanupEnvironment,
-  prepareEnvironment
+  prepareEnvironment,
+  parseCopyAction
 } from '../../src/executor/fixture.js';
-import { SetupError } from '../../src/types/index.js';
+import { SetupError, ValidationError } from '../../src/types/index.js';
 import type { EnvironmentConfig, SetupAction } from '../../src/types/index.js';
 
 const TEST_TEMP_DIR = './test-temp-fixture';
@@ -69,8 +70,8 @@ describe('Fixture Manager', () => {
   });
 
   describe('executeSetup', () => {
-    it('should execute copy action', async () => {
-      const workDir = path.join(TEST_TEMP_DIR, 'work');
+    it('should execute copy action with new syntax', async () => {
+      const workDir = path.resolve(TEST_TEMP_DIR, 'work');
       const sourceDir = path.resolve(TEST_TEMP_DIR, 'source');
 
       await fs.ensureDir(workDir);
@@ -78,12 +79,29 @@ describe('Fixture Manager', () => {
       await fs.writeFile(path.join(sourceDir, 'file.txt'), 'content');
 
       const actions: SetupAction[] = [
-        { copy: sourceDir }
+        { copy: `${sourceDir} -> ${workDir}` }
       ];
 
       await executeSetup(actions, workDir, TEST_TEMP_DIR);
 
       expect(await fs.pathExists(path.join(workDir, 'file.txt'))).toBe(true);
+    });
+
+    it('should execute copy action with $WORKDIR variable', async () => {
+      const workDir = path.resolve(TEST_TEMP_DIR, 'workdir');
+      const sourceDir = path.resolve(TEST_TEMP_DIR, 'source-var');
+
+      await fs.ensureDir(workDir);
+      await fs.ensureDir(sourceDir);
+      await fs.writeFile(path.join(sourceDir, 'data.txt'), 'variable content');
+
+      const actions: SetupAction[] = [
+        { copy: `${sourceDir} -> $WORKDIR/data/` }
+      ];
+
+      await executeSetup(actions, workDir, TEST_TEMP_DIR);
+
+      expect(await fs.pathExists(path.join(workDir, 'data', 'data.txt'))).toBe(true);
     });
 
     it('should execute run command', async () => {
@@ -100,7 +118,7 @@ describe('Fixture Manager', () => {
     });
 
     it('should execute multiple setup actions in order', async () => {
-      const workDir = path.join(TEST_TEMP_DIR, 'work');
+      const workDir = path.resolve(TEST_TEMP_DIR, 'work');
       const sourceDir = path.resolve(TEST_TEMP_DIR, 'source');
 
       await fs.ensureDir(workDir);
@@ -108,7 +126,7 @@ describe('Fixture Manager', () => {
       await fs.writeFile(path.join(sourceDir, 'base.txt'), 'base');
 
       const actions: SetupAction[] = [
-        { copy: sourceDir },
+        { copy: `${sourceDir} -> ${workDir}` },
         { run: 'echo added >> base.txt' }
       ];
 
@@ -185,10 +203,39 @@ describe('Fixture Manager', () => {
         setup: []
       };
 
-      const result = await prepareEnvironment(config, 'test', TEST_TEMP_DIR, yamlDir);
+      const result = await prepareEnvironment(config, 'test', TEST_TEMP_DIR, { yamlDirectory: yamlDir });
 
       expect(await fs.readFile(path.join(result.tempDirectory, 'test.txt'), 'utf-8'))
         .toBe('relative');
     });
+  });
+});
+
+describe('parseCopyAction', () => {
+  it('should parse valid copy action with -> separator', () => {
+    const result = parseCopyAction('./source/file.txt -> $WORKDIR/target/', '/temp/workdir');
+    expect(result.source).toBe('./source/file.txt');
+    expect(result.target).toBe('/temp/workdir/target/');
+  });
+
+  it('should throw ValidationError for copy without -> separator', () => {
+    expect(() => parseCopyAction('./source/file.txt', '/temp'))
+      .toThrow('copy must use "source -> target" format');
+  });
+
+  it('should replace $WORKDIR with actual work directory', () => {
+    const result = parseCopyAction('./source -> $WORKDIR/.opencode/agents/', '/tmp/test-123');
+    expect(result.target).toBe('/tmp/test-123/.opencode/agents/');
+  });
+
+  it('should handle paths with spaces around ->', () => {
+    const result = parseCopyAction('./source/file.txt   ->   ./target/', '/temp');
+    expect(result.source).toBe('./source/file.txt');
+    expect(result.target).toBe('./target/');
+  });
+
+  it('should replace all occurrences of $WORKDIR', () => {
+    const result = parseCopyAction('./source -> $WORKDIR/a/$WORKDIR/b', '/workdir');
+    expect(result.target).toBe('/workdir/a//workdir/b');
   });
 });

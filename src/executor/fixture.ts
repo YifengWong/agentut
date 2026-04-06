@@ -2,7 +2,29 @@ import fs from 'fs-extra';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { execSync } from 'child_process';
-import { SetupError, type EnvironmentConfig, type SetupAction, type GlobalConfig } from '../types/index.js';
+import { SetupError, ValidationError, type EnvironmentConfig, type SetupAction, type GlobalConfig } from '../types/index.js';
+
+interface CopySpec {
+  source: string;
+  target: string;
+}
+
+export function parseCopyAction(copyValue: string, workDir: string): CopySpec {
+  if (!copyValue.includes('->')) {
+    throw new ValidationError(
+      `copy must use "source -> target" format: ${copyValue}`,
+      'setup.copy'
+    );
+  }
+
+  const parts = copyValue.split('->').map(s => s.trim());
+  const source = parts[0];
+  const target = parts[1];
+
+  const resolvedTarget = target.replaceAll('$WORKDIR', workDir);
+
+  return { source, target: resolvedTarget };
+}
 
 interface PrepareEnvironmentResult {
   tempDirectory: string;
@@ -64,12 +86,18 @@ export async function executeSetup(
 ): Promise<void> {
   for (const action of actions) {
     if (action.copy) {
-      // Resolve copy path relative to yaml file location
-      let sourcePath = action.copy;
-      if (!path.isAbsolute(action.copy)) {
-        sourcePath = path.resolve(yamlDirectory, action.copy);
-      }
-      await copyEnvironment(sourcePath, workDir);
+      const spec = parseCopyAction(action.copy, workDir);
+
+      const sourcePath = path.isAbsolute(spec.source)
+        ? spec.source
+        : path.resolve(yamlDirectory, spec.source);
+      const targetPath = path.isAbsolute(spec.target)
+        ? spec.target
+        : path.resolve(yamlDirectory, spec.target);
+
+      await fs.ensureDir(path.dirname(targetPath));
+
+      await fs.copy(sourcePath, targetPath, { overwrite: true });
     }
 
     if (action.run) {
@@ -103,31 +131,7 @@ export async function cleanupEnvironment(
   }
 }
 
-/**
- * Copy skill file to target directory's .opencode/agents/ folder
- * so that opencode can load the skill
- */
-export async function copySkillToTarget(
-  skillPath: string,
-  targetDir: string
-): Promise<void> {
-  const opencodeDir = path.join(targetDir, '.opencode');
-  const agentsDir = path.join(opencodeDir, 'agents');
-
-  // Ensure .opencode/agents directory exists
-  await fs.ensureDir(agentsDir);
-
-  // Copy skill file
-  const skillFileName = path.basename(skillPath);
-  const targetSkillPath = path.join(agentsDir, skillFileName);
-  await fs.copy(skillPath, targetSkillPath, {
-    overwrite: true,
-    errorOnExist: false
-  });
-}
-
 export interface PrepareEnvironmentOptions {
-  skill?: string;
   yamlDirectory?: string;
 }
 
@@ -152,13 +156,6 @@ export async function prepareEnvironment(
 
   // Execute setup actions
   await executeSetup(config.setup, tempDir, yamlDirectory);
-
-  // Copy skill file if specified
-  if (options?.skill) {
-    // Resolve skill path relative to yaml file location
-    const skillPath = path.resolve(yamlDirectory, options.skill);
-    await copySkillToTarget(skillPath, tempDir);
-  }
 
   return {
     tempDirectory: tempDir
