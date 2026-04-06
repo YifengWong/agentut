@@ -5,6 +5,7 @@ import { runOpenCode } from '../executor/opencode.js';
 import { prepareEnvironment, cleanupEnvironment } from '../executor/fixture.js';
 import { verifyAssertions } from '../executor/verifier.js';
 import { generateTestResult } from '../output/json.js';
+import { logger } from '../output/logger.js';
 import {
   type YamlTestSuite,
   type TestResult,
@@ -46,18 +47,34 @@ export async function runTests(
     }
   }
 
+  // Log suite start
+  logger.startSuite(suite.name, scenarios.length);
+
   // Execute scenarios
   const scenarioResults: ScenarioResult[] = [];
   const tempRoot = path.resolve(yamlDirectory, '.agentvcr', 'temp');
+  const suiteStartTime = Date.now();
 
-  for (const scenario of scenarios) {
+  for (let i = 0; i < scenarios.length; i++) {
+    const scenario = scenarios[i];
     const result = await executeScenario(suite, scenario, yamlDirectory, tempRoot, {
       verbose: options.verbose,
       model: options.model,
-      agent: options.agent
+      agent: options.agent,
+      current: i + 1,
+      total: scenarios.length
     });
     scenarioResults.push(result);
+    logger.endScenario(scenario.name, result.status === 'passed', result.duration_ms);
   }
+
+  // Calculate totals
+  const passedCount = scenarioResults.filter(r => r.status === 'passed').length;
+  const failedCount = scenarioResults.filter(r => r.status === 'failed').length;
+  const totalDuration = Date.now() - suiteStartTime;
+
+  // Log summary
+  logger.summary(passedCount, failedCount, totalDuration);
 
   // Generate result
   const testResult = generateTestResult(suite, scenarioResults, testPath);
@@ -75,13 +92,20 @@ async function executeScenario(
   scenario: typeof suite.scenarios[0],
   yamlDirectory: string,
   tempRoot: string,
-  options?: { verbose?: boolean; model?: string; agent?: string }
+  options?: { verbose?: boolean; model?: string; agent?: string; current?: number; total?: number }
 ): Promise<ScenarioResult> {
   const startTime = Date.now();
   const stepResults: StepResult[] = [];
   let sessionId: string | undefined;
   let tempDirectory: string | undefined;
   let error: string | undefined;
+
+  // Get current/total for logging (defaults to 1/1)
+  const current = options?.current ?? 1;
+  const total = options?.total ?? 1;
+
+  // Log scenario start
+  logger.startScenario(scenario.name, current, total);
 
   // Get model from options or config (backwards compatibility)
   const model = options?.model || suite.config?.target?.model;
@@ -127,8 +151,15 @@ async function executeScenario(
     tempDirectory = envResult.tempDirectory;
 
     // Execute steps
-    for (const step of scenario.steps) {
+    const totalSteps = scenario.steps.length;
+    for (let stepIndex = 0; stepIndex < scenario.steps.length; stepIndex++) {
+      const step = scenario.steps[stepIndex];
       const stepStartTime = Date.now();
+      const stepNumber = stepIndex + 1;
+
+      // Log step start
+      logger.startStep(scenario.name, step.input, stepNumber, totalSteps);
+      logger.showProgress(scenario.name, 'executing...');
 
       try {
         // Run opencode
@@ -147,21 +178,29 @@ async function executeScenario(
         // Verify assertions
         const assertionResults = await verifyAssertions(step.expected, runResult.outputs, tempDirectory);
 
+        const stepPassed = assertionResults.every(a => a.passed);
+        const stepDuration = Date.now() - stepStartTime;
+
         const stepResult: StepResult = {
           input: step.input,
-          status: assertionResults.every(a => a.passed) ? 'passed' : 'failed',
-          duration_ms: Date.now() - stepStartTime,
+          status: stepPassed ? 'passed' : 'failed',
+          duration_ms: stepDuration,
           assertions: assertionResults,
           actual_output: options?.verbose ? runResult.outputs : undefined
         };
 
         stepResults.push(stepResult);
+
+        // Log step end
+        logger.endStep(scenario.name, stepPassed, stepNumber, totalSteps, stepDuration);
       } catch (err) {
-        // Handle timeout or error
+        const stepDuration = step.timeout || 60000;
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+
         const stepResult: StepResult = {
           input: step.input,
           status: 'failed',
-          duration_ms: step.timeout || 60000,
+          duration_ms: stepDuration,
           assertions: [],
           actual_output: undefined
         };
@@ -176,6 +215,10 @@ async function executeScenario(
         }
 
         stepResults.push(stepResult);
+
+        // Log error and step end
+        logger.error(scenario.name, errorMessage);
+        logger.endStep(scenario.name, false, stepNumber, totalSteps, stepDuration);
       }
     }
   } catch (err) {
@@ -186,7 +229,7 @@ async function executeScenario(
 
   // Cleanup
   if (tempDirectory) {
-    await cleanupEnvironment(tempDirectory, scenario.cleanup);
+    await cleanupEnvironment(tempDirectory, scenario.cleanup, scenario.name);
   }
 
   const allStepsPassed = stepResults.every(s => s.status === 'passed');
