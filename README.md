@@ -278,6 +278,43 @@ agentvcr run <testFile> [-f format] [-o file] [-s scenario] [--verbose]
 agentvcr report -i <jsonFile> -f <format> [-o file]
 ```
 
+### 实时日志输出
+
+运行测试时，CLI 会在控制台实时输出测试进度：
+
+```
+Running test suite: my-test-suite (2 scenarios)
+
+Running scenario 1/2: create-file
+[create-file] Preparing environment...
+[create-file] Setup: copy ./fixtures/empty -> /tmp/test-workdir
+[create-file] ✓ Environment ready (15ms)
+[create-file] Step 1/1: "创建 hello.txt 文件"
+[create-file] ⏳ executing...
+[create-file] ✓ Step 1/1 passed (12.5s)
+[create-file] Cleaning up...
+✓ create-file passed (12.6s)
+
+Running scenario 2/2: read-file
+[read-file] Preparing environment...
+[read-file] Setup: copy ./fixtures/with-hello -> /tmp/test-workdir
+[read-file] ✓ Environment ready (10ms)
+[read-file] Step 1/1: "读取 hello.txt 文件内容"
+[read-file] ⏳ executing...
+[read-file] ✓ Step 1/1 passed (8.3s)
+[read-file] Cleaning up...
+✓ read-file passed (8.4s)
+
+Summary: 2 passed, 0 failed (total 21s)
+```
+
+日志信息包括：
+- **场景准备**：环境初始化、fixture 复制操作
+- **步骤执行**：每个步骤的输入、执行状态和结果
+- **执行中状态**：`⏳ executing...` 表示 Agent 正在处理
+- **清理操作**：测试结束后的临时目录清理
+- **汇总统计**：通过/失败数量和总耗时
+
 ## 输出格式
 
 - `json` - 结构化 JSON（默认）
