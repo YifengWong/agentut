@@ -43,9 +43,8 @@ describe('matchValue', () => {
       expect(matchValue('plans', { regex: '.*writing.*' })).toBe(false);
     });
 
-    it('should match case insensitive with flags', () => {
+    it('should match case sensitive by default', () => {
       expect(matchValue('WRITE', { regex: 'write' })).toBe(false);
-      expect(matchValue('WRITE', { regex: 'write' })).toBe(false); // regex 不加 flag
     });
 
     it('should handle invalid regex gracefully', () => {

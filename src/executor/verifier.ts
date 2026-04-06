@@ -71,7 +71,7 @@ export function matchValue(actual: unknown, matcher: string | Matcher): boolean 
   }
 
   if (matcher.oneOf !== undefined) {
-    return matcher.oneOf.includes(actual as string);
+    return matcher.oneOf.includes(String(actual));
   }
 
   return false;
@@ -85,10 +85,10 @@ export function getMatcherDescription(matcher: string | Matcher): string {
     return `equals '${matcher}'`;
   }
 
-  if (matcher.equals) return `equals '${matcher.equals}'`;
-  if (matcher.contains) return `contains '${matcher.contains}'`;
-  if (matcher.regex) return `matches regex '${matcher.regex}'`;
-  if (matcher.oneOf) return `one of [${matcher.oneOf.join(', ')}]`;
+  if (matcher.equals !== undefined) return `equals '${matcher.equals}'`;
+  if (matcher.contains !== undefined) return `contains '${matcher.contains}'`;
+  if (matcher.regex !== undefined) return `matches regex '${matcher.regex}'`;
+  if (matcher.oneOf !== undefined) return `one of [${matcher.oneOf.join(', ')}]`;
 
   return 'unknown matcher';
 }
