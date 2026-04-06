@@ -55,8 +55,7 @@ class Logger {
    * Setup copy 动作
    */
   setupCopy(scenarioName: string, source: string, target: string): void {
-    const displayTarget = target.replace(/\$WORKDIR/g, '$WORKDIR');
-    console.log(`[${chalk.gray(scenarioName)}] Setup: copy ${source} -> ${displayTarget}`);
+    console.log(`[${chalk.gray(scenarioName)}] Setup: copy ${source} -> ${target}`);
   }
 
   /**
