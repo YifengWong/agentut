@@ -5,13 +5,13 @@ environments:
   empty:
     directory: ../fixtures/empty
     setup:
-      - copy: "../skills/file-operations.md -> $WORKDIR/.opencode/agents/"
+      - copy: "../skills/file-operations/ -> $WORKDIR/.opencode/skills/file-operations/"
 
   with-hello:
     directory: ../fixtures/with-hello
     setup:
       - copy: "../fixtures/templates/hello.txt -> $WORKDIR/hello.txt"
-      - copy: "../skills/file-operations.md -> $WORKDIR/.opencode/agents/"
+      - copy: "../skills/file-operations/ -> $WORKDIR/.opencode/skills/file-operations/"
 
 scenarios:
   # 场景 1：创建文件（验证 Write + 文件产生）
