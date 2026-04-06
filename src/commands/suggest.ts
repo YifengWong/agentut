@@ -40,9 +40,14 @@ export async function suggestTest(options: SuggestOptions): Promise<string> {
   }
 
   if (options.skill) {
-    yamlSuite.config = yamlSuite.config || {};
-    yamlSuite.config.target = yamlSuite.config.target || {};
-    yamlSuite.config.target.skill = options.skill;
+    // Add skill to the default environment setup
+    const defaultEnv = yamlSuite.environments.default;
+    defaultEnv.setup.push({
+      copy: `${options.skill} -> $WORKDIR/.opencode/agents/`
+    });
+    // Derive agent name from skill file
+    const skillFileName = options.skill.split('/').pop() || options.skill;
+    defaultEnv.agent = skillFileName.replace(/\.md$/, '');
   }
 
   // Convert to YAML string

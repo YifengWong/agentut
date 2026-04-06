@@ -11,12 +11,12 @@ export interface YamlTestSuite {
 export interface EnvironmentConfig {
   directory: string;
   setup: SetupAction[];
+  agent?: string;  // 可选，显式指定 agent 名称
 }
 
 export interface SetupAction {
   copy?: string;   // "source -> target" 格式，target 支持 $WORKDIR
   run?: string;
-  agent?: string;  // 可选，显式指定 agent 名称
 }
 
 export interface ScenarioConfig {
@@ -41,6 +41,12 @@ export type Assertion =
 export interface GlobalConfig {
   default_timeout?: number;
   parallel?: boolean;
+  /** @deprecated Use environment.agent and setup.copy with $WORKDIR instead */
+  target?: {
+    skill?: string;
+    agent?: string;
+    model?: string;
+  };
 }
 
 // ========== Session Analysis Types ==========

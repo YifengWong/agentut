@@ -83,23 +83,46 @@ async function executeScenario(
   let tempDirectory: string | undefined;
   let error: string | undefined;
 
-  // Get model and agent from options or config
+  // Get model from options or config (backwards compatibility)
   const model = options?.model || suite.config?.target?.model;
-  const skill = suite.config?.target?.skill;
 
-  // Derive agent name from skill file name (without .md extension)
-  let agent = options?.agent || suite.config?.target?.agent;
-  if (!agent && skill) {
-    const skillFileName = path.basename(skill, '.md');
-    agent = skillFileName;
+  // Get environment config for agent derivation
+  const envConfig = suite.environments[scenario.environment];
+
+  // Get agent name with new priority:
+  // 1. CLI options --agent
+  // 2. Environment config agent field
+  // 3. Derive from setup.copy targeting .opencode/agents
+  // 4. Config target.agent (deprecated)
+  let agent = options?.agent;
+
+  if (!agent && envConfig.agent) {
+    // Priority 2: explicit agent in environment config
+    agent = envConfig.agent;
+  }
+
+  if (!agent) {
+    // Priority 3: derive from setup.copy targeting .opencode/agents
+    const agentCopy = envConfig.setup.find(a =>
+      a.copy && a.copy.includes('->') &&
+      a.copy.split('->')[1].trim().includes('.opencode/agents')
+    );
+    if (agentCopy) {
+      const source = agentCopy.copy!.split('->')[0].trim();
+      agent = path.basename(source, '.md');
+    }
+  }
+
+  // Priority 4: backwards compatibility with config.target (deprecated)
+  if (!agent && suite.config?.target?.agent) {
+    agent = suite.config.target.agent;
   }
 
   try {
     // Prepare environment
-    const envConfig = suite.environments[scenario.environment];
     const envResult = await prepareEnvironment(envConfig, scenario.name, tempRoot, {
-      yamlDirectory,
-      skill
+      yamlDirectory
+      // skill 参数已移除
     });
     tempDirectory = envResult.tempDirectory;
 

@@ -92,7 +92,6 @@ export function generateYamlFromAnalysis(analysis: SessionAnalysis): YamlTestSui
       steps: steps
     }],
     config: {
-      target: {},
       default_timeout: 120000,
       parallel: false
     }
