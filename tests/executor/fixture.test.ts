@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'fs-extra';
 import * as path from 'path';
 import {
@@ -12,11 +12,28 @@ import {
 import { SetupError, ValidationError } from '../../src/types/index.js';
 import type { EnvironmentConfig, SetupAction } from '../../src/types/index.js';
 
+// Mock logger
+vi.mock('../../src/output/logger.js', () => ({
+  logger: {
+    startEnvironmentPrep: vi.fn(),
+    setupCopy: vi.fn(),
+    setupRun: vi.fn(),
+    endEnvironmentPrep: vi.fn(),
+    cleanup: vi.fn()
+  }
+}));
+
+import { logger } from '../../src/output/logger.js';
+
+const mockedLogger = vi.mocked(logger);
+
 const TEST_TEMP_DIR = './test-temp-fixture';
 
 describe('Fixture Manager', () => {
   beforeEach(async () => {
     await fs.ensureDir(TEST_TEMP_DIR);
+    // Clear all mock calls
+    vi.clearAllMocks();
   });
 
   afterEach(async () => {
@@ -66,6 +83,30 @@ describe('Fixture Manager', () => {
 
       await expect(copyEnvironment('/non/existent/path', targetDir))
         .rejects.toThrow(SetupError);
+    });
+
+    it('should call logger.setupCopy when scenarioName is provided', async () => {
+      const sourceDir = path.join(TEST_TEMP_DIR, 'source-log');
+      const targetDir = path.join(TEST_TEMP_DIR, 'target-log');
+
+      await fs.ensureDir(sourceDir);
+      await fs.writeFile(path.join(sourceDir, 'test.txt'), 'hello');
+
+      await copyEnvironment(sourceDir, targetDir, 'test-scenario');
+
+      expect(mockedLogger.setupCopy).toHaveBeenCalledWith('test-scenario', sourceDir, targetDir);
+    });
+
+    it('should not call logger.setupCopy when scenarioName is not provided', async () => {
+      const sourceDir = path.join(TEST_TEMP_DIR, 'source-no-log');
+      const targetDir = path.join(TEST_TEMP_DIR, 'target-no-log');
+
+      await fs.ensureDir(sourceDir);
+      await fs.writeFile(path.join(sourceDir, 'test.txt'), 'hello');
+
+      await copyEnvironment(sourceDir, targetDir);
+
+      expect(mockedLogger.setupCopy).not.toHaveBeenCalled();
     });
   });
 
@@ -148,6 +189,55 @@ describe('Fixture Manager', () => {
       await expect(executeSetup(actions, workDir, TEST_TEMP_DIR))
         .rejects.toThrow(SetupError);
     });
+
+    it('should call logger.setupCopy when scenarioName is provided for copy action', async () => {
+      const workDir = path.resolve(TEST_TEMP_DIR, 'work-log');
+      const sourceDir = path.resolve(TEST_TEMP_DIR, 'source-log');
+
+      await fs.ensureDir(workDir);
+      await fs.ensureDir(sourceDir);
+      await fs.writeFile(path.join(sourceDir, 'file.txt'), 'content');
+
+      const actions: SetupAction[] = [
+        { copy: `${sourceDir} -> ${workDir}` }
+      ];
+
+      await executeSetup(actions, workDir, TEST_TEMP_DIR, 'test-scenario');
+
+      expect(mockedLogger.setupCopy).toHaveBeenCalledWith('test-scenario', sourceDir, workDir);
+    });
+
+    it('should call logger.setupRun when scenarioName is provided for run action', async () => {
+      const workDir = path.join(TEST_TEMP_DIR, 'work-run-log');
+      await fs.ensureDir(workDir);
+
+      const actions: SetupAction[] = [
+        { run: 'echo test > output.txt' }
+      ];
+
+      await executeSetup(actions, workDir, TEST_TEMP_DIR, 'test-scenario-run');
+
+      expect(mockedLogger.setupRun).toHaveBeenCalledWith('test-scenario-run', 'echo test > output.txt');
+    });
+
+    it('should not call logger methods when scenarioName is not provided', async () => {
+      const workDir = path.resolve(TEST_TEMP_DIR, 'work-no-log');
+      const sourceDir = path.resolve(TEST_TEMP_DIR, 'source-no-log');
+
+      await fs.ensureDir(workDir);
+      await fs.ensureDir(sourceDir);
+      await fs.writeFile(path.join(sourceDir, 'file.txt'), 'content');
+
+      const actions: SetupAction[] = [
+        { copy: `${sourceDir} -> ${workDir}` },
+        { run: 'echo test > output.txt' }
+      ];
+
+      await executeSetup(actions, workDir, TEST_TEMP_DIR);
+
+      expect(mockedLogger.setupCopy).not.toHaveBeenCalled();
+      expect(mockedLogger.setupRun).not.toHaveBeenCalled();
+    });
   });
 
   describe('cleanupEnvironment', () => {
@@ -167,6 +257,33 @@ describe('Fixture Manager', () => {
       await cleanupEnvironment(tempDir, false);
 
       expect(await fs.pathExists(tempDir)).toBe(true);
+    });
+
+    it('should call logger.cleanup when scenarioName is provided', async () => {
+      const tempDir = path.join(TEST_TEMP_DIR, 'to-cleanup-log');
+      await fs.ensureDir(tempDir);
+
+      await cleanupEnvironment(tempDir, true, 'test-scenario');
+
+      expect(mockedLogger.cleanup).toHaveBeenCalledWith('test-scenario');
+    });
+
+    it('should not call logger.cleanup when scenarioName is not provided', async () => {
+      const tempDir = path.join(TEST_TEMP_DIR, 'to-cleanup-no-log');
+      await fs.ensureDir(tempDir);
+
+      await cleanupEnvironment(tempDir, true);
+
+      expect(mockedLogger.cleanup).not.toHaveBeenCalled();
+    });
+
+    it('should not call logger.cleanup when cleanup is false', async () => {
+      const tempDir = path.join(TEST_TEMP_DIR, 'to-keep-no-log');
+      await fs.ensureDir(tempDir);
+
+      await cleanupEnvironment(tempDir, false, 'test-scenario');
+
+      expect(mockedLogger.cleanup).not.toHaveBeenCalled();
     });
   });
 
@@ -207,6 +324,35 @@ describe('Fixture Manager', () => {
 
       expect(await fs.readFile(path.join(result.tempDirectory, 'test.txt'), 'utf-8'))
         .toBe('relative');
+    });
+
+    it('should call logger.startEnvironmentPrep and endEnvironmentPrep', async () => {
+      const envSource = path.join(TEST_TEMP_DIR, 'env-log');
+      await fs.ensureDir(envSource);
+      await fs.writeFile(path.join(envSource, 'test.txt'), 'content');
+
+      const config: EnvironmentConfig = {
+        directory: envSource,
+        setup: []
+      };
+
+      await prepareEnvironment(config, 'test-scenario-log', TEST_TEMP_DIR);
+
+      expect(mockedLogger.startEnvironmentPrep).toHaveBeenCalledWith('test-scenario-log');
+      expect(mockedLogger.endEnvironmentPrep).toHaveBeenCalledWith('test-scenario-log', true, expect.any(Number));
+    });
+
+    it('should call logger.endEnvironmentPrep with false on error', async () => {
+      const config: EnvironmentConfig = {
+        directory: '/non/existent/path',
+        setup: []
+      };
+
+      await expect(prepareEnvironment(config, 'test-scenario-error', TEST_TEMP_DIR))
+        .rejects.toThrow();
+
+      expect(mockedLogger.startEnvironmentPrep).toHaveBeenCalledWith('test-scenario-error');
+      expect(mockedLogger.endEnvironmentPrep).toHaveBeenCalledWith('test-scenario-error', false, expect.any(Number));
     });
   });
 });

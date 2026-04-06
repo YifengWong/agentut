@@ -3,6 +3,7 @@ import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { execSync } from 'child_process';
 import { SetupError, ValidationError, type EnvironmentConfig, type SetupAction, type GlobalConfig } from '../types/index.js';
+import { logger } from '../output/logger.js';
 
 interface CopySpec {
   source: string;
@@ -53,8 +54,13 @@ export async function createTempDirectory(
 
 export async function copyEnvironment(
   sourcePath: string,
-  targetDir: string
+  targetDir: string,
+  scenarioName?: string
 ): Promise<void> {
+  if (scenarioName) {
+    logger.setupCopy(scenarioName, sourcePath, targetDir);
+  }
+
   const exists = await fs.pathExists(sourcePath);
   if (!exists) {
     throw new SetupError(`Source does not exist: ${sourcePath}`);
@@ -82,7 +88,8 @@ export async function copyEnvironment(
 export async function executeSetup(
   actions: SetupAction[],
   workDir: string,
-  yamlDirectory: string
+  yamlDirectory: string,
+  scenarioName?: string
 ): Promise<void> {
   for (const action of actions) {
     if (action.copy) {
@@ -95,12 +102,20 @@ export async function executeSetup(
         ? spec.target
         : path.resolve(yamlDirectory, spec.target);
 
+      if (scenarioName) {
+        logger.setupCopy(scenarioName, sourcePath, targetPath);
+      }
+
       await fs.ensureDir(path.dirname(targetPath));
 
       await fs.copy(sourcePath, targetPath, { overwrite: true });
     }
 
     if (action.run) {
+      if (scenarioName) {
+        logger.setupRun(scenarioName, action.run);
+      }
+
       try {
         execSync(action.run, {
           cwd: workDir,
@@ -120,9 +135,13 @@ export async function executeSetup(
 
 export async function cleanupEnvironment(
   directory: string,
-  shouldCleanup: boolean
+  shouldCleanup: boolean,
+  scenarioName?: string
 ): Promise<void> {
   if (shouldCleanup) {
+    if (scenarioName) {
+      logger.cleanup(scenarioName);
+    }
     try {
       await fs.remove(directory);
     } catch {
@@ -141,23 +160,35 @@ export async function prepareEnvironment(
   tempRoot: string,
   options?: PrepareEnvironmentOptions
 ): Promise<PrepareEnvironmentResult> {
+  const startTime = Date.now();
   const yamlDirectory = options?.yamlDirectory || process.cwd();
 
-  // Create temp directory
-  const tempDir = await createTempDirectory(scenarioName, tempRoot);
+  logger.startEnvironmentPrep(scenarioName);
 
-  // Resolve source directory (relative to yaml file location)
-  const sourceDir = yamlDirectory
-    ? path.resolve(yamlDirectory, config.directory)
-    : path.resolve(config.directory);
+  try {
+    // Create temp directory
+    const tempDir = await createTempDirectory(scenarioName, tempRoot);
 
-  // Copy environment
-  await copyEnvironment(sourceDir, tempDir);
+    // Resolve source directory (relative to yaml file location)
+    const sourceDir = yamlDirectory
+      ? path.resolve(yamlDirectory, config.directory)
+      : path.resolve(config.directory);
 
-  // Execute setup actions
-  await executeSetup(config.setup, tempDir, yamlDirectory);
+    // Copy environment
+    await copyEnvironment(sourceDir, tempDir, scenarioName);
 
-  return {
-    tempDirectory: tempDir
-  };
+    // Execute setup actions
+    await executeSetup(config.setup, tempDir, yamlDirectory, scenarioName);
+
+    const duration = Date.now() - startTime;
+    logger.endEnvironmentPrep(scenarioName, true, duration);
+
+    return {
+      tempDirectory: tempDir
+    };
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    logger.endEnvironmentPrep(scenarioName, false, duration);
+    throw error;
+  }
 }
