@@ -94,39 +94,91 @@ export function getMatcherDescription(matcher: string | Matcher): string {
 }
 
 /**
- * Verify that a specific tool was called in the outputs
+ * Verify that a specific tool was called with optional Matcher support
  */
 export function verifyShouldCallTool(
   outputs: OpenCodeRunOutput[],
-  toolName: string
+  assertion: string | ToolCallAssertion
 ): AssertionResult {
-  // Check both new format (part.tool) and legacy format (data.tool_name)
-  const toolCalls = outputs.filter(output => {
-    // New format: type: "tool_use", part.tool
-    if (output.part?.tool) {
-      return output.part.tool.toLowerCase() === toolName.toLowerCase();
+  // 解析断言
+  const toolAssertion: ToolCallAssertion = typeof assertion === 'string'
+    ? { name: assertion }
+    : assertion;
+
+  // 查找匹配的工具调用
+  const matches = outputs.filter(output => {
+    // Check new format (type: "tool_use", part.tool)
+    if (output.type === 'tool_use') {
+      const tool = output.part?.tool?.toLowerCase() || '';
+      const input = output.part?.state?.input || {};
+      const status = output.part?.state?.status || '';
+
+      // 验证 name（工具名通常是小写）
+      const expectedName = typeof toolAssertion.name === 'string'
+        ? toolAssertion.name.toLowerCase()
+        : toolAssertion.name;
+
+      if (!matchValue(tool, expectedName)) return false;
+
+      // 验证 input
+      if (toolAssertion.input) {
+        for (const [key, valueMatcher] of Object.entries(toolAssertion.input)) {
+          if (!matchValue(input[key], valueMatcher)) return false;
+        }
+      }
+
+      // 验证 status
+      if (toolAssertion.status && status !== toolAssertion.status) return false;
+
+      return true;
     }
-    // Legacy format: type: "tool_call", data.tool_name
-    if (output.data?.tool_name) {
-      return output.data.tool_name === toolName;
+
+    // Legacy format (type: "tool_call", data.tool_name)
+    if (output.type === 'tool_call' && output.data?.tool_name) {
+      const tool = output.data.tool_name.toLowerCase();
+      const expectedName = typeof toolAssertion.name === 'string'
+        ? toolAssertion.name.toLowerCase()
+        : toolAssertion.name;
+
+      // Legacy format doesn't support input/status matching
+      // Only match on name, and only for simple string assertions
+      if (toolAssertion.input || toolAssertion.status) {
+        return false;
+      }
+
+      return matchValue(tool, expectedName);
     }
+
     return false;
   });
 
-  if (toolCalls.length > 0) {
-    return {
-      type: 'should_call_tool',
-      value: toolName,
-      passed: true,
-      message: `Tool '${toolName}' was called ${toolCalls.length} times`
-    };
-  }
+  // 构建结果
+  const passed = matches.length > 0;
+
+  // 获取第一个匹配的实际值（用于调试）
+  const actual = matches.length > 0 ? {
+    tool: matches[0].part?.tool || matches[0].data?.tool_name,
+    input: matches[0].part?.state?.input,
+    status: matches[0].part?.state?.status
+  } : undefined;
+
+  // 构建描述
+  const nameDesc = getMatcherDescription(toolAssertion.name);
+  const inputDesc = toolAssertion.input
+    ? Object.entries(toolAssertion.input)
+        .map(([k, v]) => `${k} ${getMatcherDescription(v)}`)
+        .join(', ')
+    : '';
+  const statusDesc = toolAssertion.status ? `, status='${toolAssertion.status}'` : '';
 
   return {
     type: 'should_call_tool',
-    value: toolName,
-    passed: false,
-    message: `Tool '${toolName}' was not called`
+    value: toolAssertion,
+    passed,
+    actual,
+    message: passed
+      ? `Found matching tool call: ${actual?.tool}${inputDesc ? `(${inputDesc})` : ''}${statusDesc}`
+      : `No tool call found with name ${nameDesc}${inputDesc ? `, input ${inputDesc}` : ''}${statusDesc}`
   };
 }
 
@@ -274,25 +326,7 @@ export async function verifyAssertions(
 
   for (const assertion of assertions) {
     if ('should_call_tool' in assertion) {
-      const value = assertion.should_call_tool;
-      if (isString(value)) {
-        results.push(verifyShouldCallTool(outputs, value));
-      } else if (isToolCallAssertion(value)) {
-        // Matcher mode: will be implemented in Task 3
-        results.push({
-          type: 'should_call_tool',
-          value: value,
-          passed: false,
-          message: 'ToolCallAssertion with Matcher is not yet implemented'
-        });
-      } else {
-        results.push({
-          type: 'should_call_tool',
-          value: value,
-          passed: false,
-          message: 'Invalid should_call_tool assertion value'
-        });
-      }
+      results.push(verifyShouldCallTool(outputs, assertion.should_call_tool));
     }
 
     if ('should_produce_file' in assertion) {

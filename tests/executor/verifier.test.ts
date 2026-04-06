@@ -42,7 +42,7 @@ describe('Verifier', () => {
       const result = verifyShouldCallTool(outputs, 'Write');
 
       expect(result.passed).toBe(false);
-      expect(result.message).toContain('not called');
+      expect(result.message).toContain('No tool call found');
     });
 
     it('should handle empty outputs', () => {
@@ -51,6 +51,227 @@ describe('Verifier', () => {
       const result = verifyShouldCallTool(outputs, 'Write');
 
       expect(result.passed).toBe(false);
+    });
+  });
+
+  describe('verifyShouldCallTool with Matcher', () => {
+    it('should support ToolCallAssertion object format', () => {
+      const outputs: OpenCodeRunOutput[] = [
+        {
+          type: 'tool_use',
+          timestamp: 1,
+          sessionID: 'ses_1',
+          part: {
+            tool: 'skill',
+            state: {
+              status: 'completed',
+              input: { name: 'brainstorming' }
+            }
+          }
+        }
+      ];
+
+      const result = verifyShouldCallTool(outputs, {
+        name: 'Skill',
+        input: { name: 'brainstorming' },
+        status: 'completed'
+      });
+
+      expect(result.passed).toBe(true);
+      expect(result.actual?.tool).toBe('skill');
+      expect(result.actual?.input?.name).toBe('brainstorming');
+    });
+
+    it('should support Matcher in name', () => {
+      const outputs: OpenCodeRunOutput[] = [
+        {
+          type: 'tool_use',
+          timestamp: 1,
+          sessionID: 'ses_1',
+          part: {
+            tool: 'skill',
+            state: { status: 'completed', input: {} }
+          }
+        }
+      ];
+
+      const result = verifyShouldCallTool(outputs, {
+        name: { regex: '.*skill.*' }
+      });
+
+      expect(result.passed).toBe(true);
+    });
+
+    it('should support Matcher in input', () => {
+      const outputs: OpenCodeRunOutput[] = [
+        {
+          type: 'tool_use',
+          timestamp: 1,
+          sessionID: 'ses_1',
+          part: {
+            tool: 'skill',
+            state: {
+              status: 'completed',
+              input: { name: 'writing-plans' }
+            }
+          }
+        }
+      ];
+
+      const result = verifyShouldCallTool(outputs, {
+        name: 'Skill',
+        input: { name: { regex: '.*writing.*' } }
+      });
+
+      expect(result.passed).toBe(true);
+    });
+
+    it('should support contains matcher in input', () => {
+      const outputs: OpenCodeRunOutput[] = [
+        {
+          type: 'tool_use',
+          timestamp: 1,
+          sessionID: 'ses_1',
+          part: {
+            tool: 'write',
+            state: {
+              status: 'completed',
+              input: { filePath: '/path/to/config.json' }
+            }
+          }
+        }
+      ];
+
+      const result = verifyShouldCallTool(outputs, {
+        name: 'Write',
+        input: { filePath: { contains: '.json' } }
+      });
+
+      expect(result.passed).toBe(true);
+    });
+
+    it('should support status matching', () => {
+      const outputs: OpenCodeRunOutput[] = [
+        {
+          type: 'tool_use',
+          timestamp: 1,
+          sessionID: 'ses_1',
+          part: {
+            tool: 'skill',
+            state: {
+              status: 'error',
+              input: { name: 'brainstorming' },
+              error: 'Skill not found'
+            }
+          }
+        }
+      ];
+
+      const result = verifyShouldCallTool(outputs, {
+        name: 'Skill',
+        input: { name: 'brainstorming' },
+        status: 'error'
+      });
+
+      expect(result.passed).toBe(true);
+      expect(result.actual?.status).toBe('error');
+    });
+
+    it('should fail when status does not match', () => {
+      const outputs: OpenCodeRunOutput[] = [
+        {
+          type: 'tool_use',
+          timestamp: 1,
+          sessionID: 'ses_1',
+          part: {
+            tool: 'skill',
+            state: { status: 'error', input: { name: 'test' } }
+          }
+        }
+      ];
+
+      const result = verifyShouldCallTool(outputs, {
+        name: 'Skill',
+        status: 'completed'
+      });
+
+      expect(result.passed).toBe(false);
+    });
+
+    it('should support oneOf matcher', () => {
+      const outputs: OpenCodeRunOutput[] = [
+        {
+          type: 'tool_use',
+          timestamp: 1,
+          sessionID: 'ses_1',
+          part: {
+            tool: 'skill',
+            state: { status: 'completed', input: {} }
+          }
+        }
+      ];
+
+      const result = verifyShouldCallTool(outputs, {
+        name: { oneOf: ['Skill', 'skill', 'SKILL'] }
+      });
+
+      expect(result.passed).toBe(true);
+    });
+
+    it('should match multiple tool calls independently', () => {
+      const outputs: OpenCodeRunOutput[] = [
+        {
+          type: 'tool_use',
+          timestamp: 1,
+          sessionID: 'ses_1',
+          part: {
+            tool: 'skill',
+            state: { status: 'completed', input: { name: 'brainstorming' } }
+          }
+        },
+        {
+          type: 'tool_use',
+          timestamp: 2,
+          sessionID: 'ses_1',
+          part: {
+            tool: 'skill',
+            state: { status: 'completed', input: { name: 'writing-plans' } }
+          }
+        }
+      ];
+
+      // 第一条断言匹配第一次调用
+      const result1 = verifyShouldCallTool(outputs, {
+        name: 'Skill',
+        input: { name: 'brainstorming' }
+      });
+
+      // 第二条断言匹配第二次调用
+      const result2 = verifyShouldCallTool(outputs, {
+        name: 'Skill',
+        input: { name: { regex: '.*writing.*' } }
+      });
+
+      expect(result1.passed).toBe(true);
+      expect(result2.passed).toBe(true);
+    });
+
+    it('should remain backward compatible with string format', () => {
+      const outputs: OpenCodeRunOutput[] = [
+        {
+          type: 'tool_use',
+          timestamp: 1,
+          sessionID: 'ses_1',
+          part: {
+            tool: 'write',
+            state: { status: 'completed', input: {} }
+          }
+        }
+      ];
+
+      const result = verifyShouldCallTool(outputs, 'Write');
+
+      expect(result.passed).toBe(true);
     });
   });
 
