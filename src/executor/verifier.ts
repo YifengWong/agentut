@@ -39,6 +39,61 @@ function isFileContentAssertion(value: unknown): value is FileContentAssertion {
 }
 
 /**
+ * 使用 Matcher 模式匹配值
+ * @param actual 实际值
+ * @param matcher Matcher 对象或字符串（字符串 = equals）
+ * @returns 是否匹配
+ */
+export function matchValue(actual: unknown, matcher: string | Matcher): boolean {
+  // 字符串 = 精确匹配
+  if (typeof matcher === 'string') {
+    return actual === matcher;
+  }
+
+  // 转换 actual 为字符串（用于 contains/regex）
+  const actualStr = String(actual);
+
+  // Matcher 对象（按优先级检查）
+  if (matcher.equals !== undefined) {
+    return actual === matcher.equals;
+  }
+
+  if (matcher.contains !== undefined) {
+    return actualStr.includes(matcher.contains);
+  }
+
+  if (matcher.regex !== undefined) {
+    try {
+      return new RegExp(matcher.regex).test(actualStr);
+    } catch {
+      return false; // 无效正则返回 false
+    }
+  }
+
+  if (matcher.oneOf !== undefined) {
+    return matcher.oneOf.includes(actual as string);
+  }
+
+  return false;
+}
+
+/**
+ * 获取匹配类型描述（用于 message）
+ */
+export function getMatcherDescription(matcher: string | Matcher): string {
+  if (typeof matcher === 'string') {
+    return `equals '${matcher}'`;
+  }
+
+  if (matcher.equals) return `equals '${matcher.equals}'`;
+  if (matcher.contains) return `contains '${matcher.contains}'`;
+  if (matcher.regex) return `matches regex '${matcher.regex}'`;
+  if (matcher.oneOf) return `one of [${matcher.oneOf.join(', ')}]`;
+
+  return 'unknown matcher';
+}
+
+/**
  * Verify that a specific tool was called in the outputs
  */
 export function verifyShouldCallTool(
