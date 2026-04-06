@@ -141,6 +141,94 @@ describe('formatAsMarkdown', () => {
 
     expect(markdown).toContain('No scenarios executed');
   });
+
+  it('should display multiple steps in a scenario', () => {
+    const result: TestResult = {
+      suite: { name: 'test', description: '', file: './test.yaml' },
+      summary: { total_scenarios: 1, passed: 1, failed: 0, duration_ms: 200, timestamp: '' },
+      scenarios: [
+        {
+          name: 'multi-step-scenario',
+          environment: 'default',
+          status: 'passed',
+          duration_ms: 200,
+          steps: [
+            {
+              input: 'Step 1 input',
+              status: 'passed',
+              duration_ms: 100,
+              assertions: [{ type: 'should_call_tool', value: 'Write', passed: true, message: 'OK' }]
+            },
+            {
+              input: 'Step 2 input',
+              status: 'passed',
+              duration_ms: 100,
+              assertions: [{ type: 'response_contains', value: 'success', passed: true, message: 'Found' }]
+            }
+          ]
+        }
+      ]
+    };
+
+    const markdown = formatAsMarkdown(result);
+
+    expect(markdown).toContain('1. **Input:** "Step 1 input"');
+    expect(markdown).toContain('2. **Input:** "Step 2 input"');
+    expect(markdown).toContain('should_call_tool: Write');
+    expect(markdown).toContain('response_contains: success');
+  });
+
+  it('should display session output for each step in multi-step scenario', () => {
+    const step1Output: OpenCodeRunOutput[] = [
+      { type: 'text', part: { text: 'Step 1 response' } },
+      { type: 'tool_use', part: { tool: 'write', state: { status: 'completed', input: { file: 'a.txt' } } } }
+    ];
+    const step2Output: OpenCodeRunOutput[] = [
+      { type: 'text', part: { text: 'Step 2 response' } },
+      { type: 'tool_use', part: { tool: 'read', state: { status: 'completed', input: { file: 'b.txt' } } } }
+    ];
+
+    const result: TestResult = {
+      suite: { name: 'test', description: '', file: './test.yaml' },
+      summary: { total_scenarios: 1, passed: 1, failed: 0, duration_ms: 200, timestamp: '' },
+      scenarios: [
+        {
+          name: 'multi-step-with-session',
+          environment: 'default',
+          status: 'passed',
+          duration_ms: 200,
+          steps: [
+            {
+              input: 'Create file',
+              status: 'passed',
+              duration_ms: 100,
+              assertions: [],
+              actual_output: step1Output
+            },
+            {
+              input: 'Read file',
+              status: 'passed',
+              duration_ms: 100,
+              assertions: [],
+              actual_output: step2Output
+            }
+          ]
+        }
+      ]
+    };
+
+    const markdown = formatAsMarkdown(result);
+
+    // Step 1 session output
+    expect(markdown).toContain('> Create file');
+    expect(markdown).toContain('Step 1 response');
+    expect(markdown).toContain('| write |');
+
+    // Step 2 session output
+    expect(markdown).toContain('> Read file');
+    expect(markdown).toContain('Step 2 response');
+    expect(markdown).toContain('| read |');
+  });
 });
 
 describe('formatSessionOutputMarkdown', () => {

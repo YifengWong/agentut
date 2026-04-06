@@ -90,6 +90,98 @@ describe('formatAsHtml', () => {
 
     expect(html).toContain('width=device-width');
   });
+
+  it('should display multiple steps in a scenario', () => {
+    const result: TestResult = {
+      suite: { name: 'test', description: '', file: './test.yaml' },
+      summary: { total_scenarios: 1, passed: 1, failed: 0, duration_ms: 200, timestamp: '' },
+      scenarios: [
+        {
+          name: 'multi-step-scenario',
+          environment: 'default',
+          status: 'passed',
+          duration_ms: 200,
+          steps: [
+            {
+              input: 'Step 1 input',
+              status: 'passed',
+              duration_ms: 100,
+              assertions: [{ type: 'should_call_tool', value: 'Write', passed: true, message: 'OK' }]
+            },
+            {
+              input: 'Step 2 input',
+              status: 'passed',
+              duration_ms: 100,
+              assertions: [{ type: 'response_contains', value: 'success', passed: true, message: 'Found' }]
+            }
+          ]
+        }
+      ]
+    };
+
+    const html = formatAsHtml(result);
+
+    expect(html).toContain('1. Input: "Step 1 input"');
+    expect(html).toContain('2. Input: "Step 2 input"');
+    expect(html).toContain('should_call_tool: Write');
+    expect(html).toContain('response_contains: success');
+  });
+
+  it('should display session output for each step in multi-step scenario', () => {
+    const step1Output: OpenCodeRunOutput[] = [
+      { type: 'text', part: { text: 'Step 1 response' } },
+      { type: 'tool_use', part: { tool: 'write', state: { status: 'completed', input: { file: 'a.txt' } } } }
+    ];
+    const step2Output: OpenCodeRunOutput[] = [
+      { type: 'text', part: { text: 'Step 2 response' } },
+      { type: 'tool_use', part: { tool: 'read', state: { status: 'completed', input: { file: 'b.txt' } } } }
+    ];
+
+    const result: TestResult = {
+      suite: { name: 'test', description: '', file: './test.yaml' },
+      summary: { total_scenarios: 1, passed: 1, failed: 0, duration_ms: 200, timestamp: '' },
+      scenarios: [
+        {
+          name: 'multi-step-with-session',
+          environment: 'default',
+          status: 'passed',
+          duration_ms: 200,
+          steps: [
+            {
+              input: 'Create file',
+              status: 'passed',
+              duration_ms: 100,
+              assertions: [],
+              actual_output: step1Output
+            },
+            {
+              input: 'Read file',
+              status: 'passed',
+              duration_ms: 100,
+              assertions: [],
+              actual_output: step2Output
+            }
+          ]
+        }
+      ]
+    };
+
+    const html = formatAsHtml(result);
+
+    // Step 1 session output
+    expect(html).toContain('<blockquote>Create file</blockquote>');
+    expect(html).toContain('Step 1 response');
+    expect(html).toContain('<td>write</td>');
+
+    // Step 2 session output
+    expect(html).toContain('<blockquote>Read file</blockquote>');
+    expect(html).toContain('Step 2 response');
+    expect(html).toContain('<td>read</td>');
+
+    // Both step-session divs should exist
+    const sessionDivCount = (html.match(/class="step-session"/g) || []).length;
+    expect(sessionDivCount).toBe(2);
+  });
 });
 
 // Test fixtures for formatSessionOutputHtml
@@ -127,6 +219,15 @@ describe('formatSessionOutputHtml', () => {
     const result = formatSessionOutputHtml(output, 'test');
     expect(result).toContain('&lt;script&gt;');
     expect(result).not.toContain('<script>');
+  });
+
+  it('should escape XSS in request parameter', () => {
+    const output: OpenCodeRunOutput[] = [
+      { type: 'text', part: { text: 'Normal response' } }
+    ];
+    const result = formatSessionOutputHtml(output, 'Test <script>alert("xss")</script>');
+    expect(result).toContain('&lt;script&gt;');
+    expect(result).not.toContain('<script>alert');
   });
 
   it('should format error status', () => {

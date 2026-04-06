@@ -149,6 +149,22 @@ agentvcr report -i <jsonFile> -f <format> [-o file]
 - `html` - 带样式的 HTML 报告
 - `jest` - Jest 兼容格式，便于 CI 集成
 
+### 会话内容展示
+
+使用 `--verbose` 参数时，markdown 和 html 格式的测试报告会包含完整的会话内容：
+
+- **Request**: 用户的输入请求
+- **Response**: Agent 的文本响应
+- **Tool Calls**: 工具调用列表（工具名、状态、输入参数）
+- **Raw Output**: 原始 JSON 输出（折叠显示）
+
+示例：
+
+```bash
+agentvcr run ./tests/ --verbose -f markdown -o report.md
+agentvcr run ./tests/ --verbose -f html -o report.html
+```
+
 ## CI/CD 集成
 
 ```bash
