@@ -113,12 +113,127 @@ agent 名称按以下优先级确定：
 
 ## 断言类型
 
+### 基本断言格式（向后兼容）
+
 | 断言类型 | 参数格式 | 验证内容 |
 |----------|----------|----------|
 | `should_call_tool` | 字符串：工具名称 | 验证 Agent 调用了指定工具 |
 | `should_produce_file` | 字符串：文件路径 | 验证产生了指定文件 |
 | `file_content_contains` | `{ file, text }` | 验证文件内容包含指定文本 |
 | `response_contains` | 字符串：文本 | 验证响应包含指定文本 |
+
+### Matcher 模式（灵活匹配）
+
+所有断言类型都支持 **Matcher 对象**，提供更灵活的匹配方式：
+
+```yaml
+expected:
+  - should_call_tool:
+      name: { regex: ".*skill.*" }     # 正则匹配工具名
+      input:
+        name: { contains: "debug" }    # 包含匹配 input 参数
+      status: completed                 # 状态匹配
+
+  - should_produce_file: { regex: ".*\\.json$" }  # 正则匹配文件名
+
+  - file_content_contains:
+      file: { equals: "config.json" }
+      text: { regex: ".*apiKey.*" }
+
+  - response_contains: { oneOf: ["success", "done", "完成"] }
+```
+
+### Matcher 类型
+
+| Matcher 字段 | 匹配方式 | 示例 |
+|-------------|---------|------|
+| `equals` | 精确匹配 | `{ equals: "Write" }` |
+| `contains` | 包含匹配（字符串） | `{ contains: "debugging" }` |
+| `regex` | 正则表达式匹配 | `{ regex: ".*skill.*" }` |
+| `oneOf` | 候选值匹配（任意一个） | `{ oneOf: ["success", "done"] }` |
+
+**简写规则：**
+- 字符串值自动推断为 `{ equals: value }`
+- Matcher 对象只有一个字段有效，按优先级：equals > contains > regex > oneOf
+
+### 多技能激活断言
+
+当 Agent 在一次执行中激活多个 Skill 时，使用多条 `should_call_tool` 断言：
+
+```yaml
+steps:
+  - input: "请帮我设计并实现一个功能"
+    expected:
+      # 验证 brainstorming 技能被激活
+      - should_call_tool:
+          name: Skill
+          input:
+            name: brainstorming
+          status: completed
+
+      # 验证 writing-plans 技能被激活（正则匹配）
+      - should_call_tool:
+          name: Skill
+          input:
+            name: { regex: ".*writing.*" }
+          status: completed
+```
+
+每条断言独立匹配一次工具调用，两条都通过表示两个技能都被激活。
+
+### ToolCallAssertion 详细格式
+
+```typescript
+interface ToolCallAssertion {
+  name: string | Matcher;                       // 工具名
+  input?: Record<string, string | Matcher>;     // input 参数匹配
+  status?: 'completed' | 'error' | 'pending';   // 状态匹配
+}
+```
+
+**完整示例：**
+
+```yaml
+expected:
+  # 简单格式（向后兼容）
+  - should_call_tool: Write
+
+  # 精确匹配 tool + input + status
+  - should_call_tool:
+      name: Skill
+      input:
+        name: brainstorming
+      status: completed
+
+  # Matcher 组合使用
+  - should_call_tool:
+      name: { oneOf: [Skill, skill] }
+      input:
+        name: { regex: ".*debugging.*" }
+      status: error  # 验证技能调用失败
+```
+
+### 验证结果示例
+
+Matcher 模式的断言结果会包含实际值，便于调试：
+
+```json
+{
+  "type": "should_call_tool",
+  "value": {
+    "name": "Skill",
+    "input": { "name": { "regex": ".*writing.*" } },
+    "status": "completed"
+  },
+  "passed": true,
+  "actual": {
+    "tool": "skill",
+    "input": { "name": "writing-plans" },
+    "status": "completed"
+  },
+  "message": "Found matching tool call: skill(name matches regex '.*writing.*')"
+}
+```
 
 ## CLI 命令
 
