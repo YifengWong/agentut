@@ -44,7 +44,12 @@ function isFileContentAssertion(value: unknown): value is FileContentAssertion {
  * @param matcher Matcher 对象或字符串（字符串 = equals）
  * @returns 是否匹配
  */
-export function matchValue(actual: unknown, matcher: string | Matcher): boolean {
+export function matchValue(actual: unknown, matcher: string | Matcher | undefined): boolean {
+  // 处理 matcher 为 undefined 的情况
+  if (matcher === undefined || matcher === null) {
+    return actual === undefined || actual === null;
+  }
+
   // 字符串 = 精确匹配
   if (typeof matcher === 'string') {
     return actual === matcher;
@@ -80,7 +85,11 @@ export function matchValue(actual: unknown, matcher: string | Matcher): boolean 
 /**
  * 获取匹配类型描述（用于 message）
  */
-export function getMatcherDescription(matcher: string | Matcher): string {
+export function getMatcherDescription(matcher: string | Matcher | undefined): string {
+  if (matcher === undefined || matcher === null) {
+    return 'undefined';
+  }
+
   if (typeof matcher === 'string') {
     return `equals '${matcher}'`;
   }
@@ -186,134 +195,180 @@ export function verifyShouldCallTool(
 }
 
 /**
- * Verify that a file was produced in the working directory
+ * Verify that a file was produced in the working directory with Matcher support
  */
 export async function verifyShouldProduceFile(
   workDir: string,
-  filePath: string
+  assertion: string | Matcher
 ): Promise<AssertionResult> {
-  // Handle absolute or relative paths
-  const fullPath = path.isAbsolute(filePath)
-    ? filePath
-    : path.join(workDir, filePath);
-
-  const exists = await fs.pathExists(fullPath);
-
-  if (exists) {
+  // 对于字符串形式的绝对路径，保持原有行为
+  if (typeof assertion === 'string' && path.isAbsolute(assertion)) {
+    const exists = await fs.pathExists(assertion);
     return {
       type: 'should_produce_file',
-      value: filePath,
-      passed: true,
-      message: `File '${filePath}' exists`
+      value: assertion,
+      passed: exists,
+      message: exists
+        ? `File '${assertion}' exists`
+        : `File '${assertion}' not found`
     };
   }
 
+  const matcher: Matcher = typeof assertion === 'string'
+    ? { equals: assertion }
+    : assertion;
+
+  // 获取目录下所有文件（递归）
+  const files: string[] = [];
+
+  async function collectFiles(dir: string, baseDir: string): Promise<void> {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await collectFiles(fullPath, baseDir);
+      } else if (entry.isFile()) {
+        // 返回相对路径
+        files.push(path.relative(baseDir, fullPath));
+      }
+    }
+  }
+
+  try {
+    await collectFiles(workDir, workDir);
+  } catch {
+    // 目录不存在
+  }
+
+  // 查找匹配的文件
+  const matches = files.filter(file => matchValue(file, matcher));
+
+  const passed = matches.length > 0;
+
   return {
     type: 'should_produce_file',
-    value: filePath,
-    passed: false,
-    message: `File '${filePath}' not found`
+    value: assertion,
+    passed,
+    actual: { files: matches },
+    message: passed
+      ? `Found matching file(s): ${matches.join(', ')}`
+      : `No file found matching ${getMatcherDescription(matcher)}`
   };
 }
 
 /**
- * Verify that a file contains specific content
+ * Verify that a file contains specific content with Matcher support
  */
 export async function verifyFileContentContains(
   workDir: string,
-  filePath: string,
-  content: string
+  assertion: { file: string; text: string } | FileContentAssertion
 ): Promise<AssertionResult> {
-  // Handle absolute or relative paths
-  const fullPath = path.isAbsolute(filePath)
-    ? filePath
-    : path.join(workDir, filePath);
+  // 解析断言
+  // file 使用 equals（精确匹配文件名）
+  const fileMatcher: Matcher = typeof assertion.file === 'string'
+    ? { equals: assertion.file }
+    : assertion.file;
 
-  const exists = await fs.pathExists(fullPath);
+  // text 使用 contains（内容包含检查）- 保持向后兼容
+  const textMatcher: Matcher = typeof assertion.text === 'string'
+    ? { contains: assertion.text }
+    : assertion.text;
 
-  if (!exists) {
-    return {
-      type: 'file_content_contains',
-      value: { file: filePath, text: content },
-      passed: false,
-      message: `File '${filePath}' not found`
-    };
+  // 获取目录下所有文件
+  const files: string[] = [];
+
+  async function collectFiles(dir: string, baseDir: string): Promise<void> {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await collectFiles(fullPath, baseDir);
+      } else if (entry.isFile()) {
+        files.push(path.relative(baseDir, fullPath));
+      }
+    }
   }
 
   try {
-    const fileContent = await fs.readFile(fullPath, 'utf-8');
+    await collectFiles(workDir, workDir);
+  } catch {
+    // 目录不存在
+  }
 
-    if (fileContent.includes(content)) {
-      return {
-        type: 'file_content_contains',
-        value: { file: filePath, text: content },
-        passed: true,
-        message: `Content '${content}' found in '${filePath}'`
-      };
-    }
+  // 查找匹配的文件
+  const matchedFiles = files.filter(f => matchValue(f, fileMatcher));
 
+  if (matchedFiles.length === 0) {
     return {
       type: 'file_content_contains',
-      value: { file: filePath, text: content },
+      value: assertion,
       passed: false,
-      message: `Content '${content}' not found in '${filePath}'`
-    };
-  } catch (error) {
-    return {
-      type: 'file_content_contains',
-      value: { file: filePath, text: content },
-      passed: false,
-      message: `Error reading file '${filePath}': ${error instanceof Error ? error.message : 'Unknown error'}`
+      actual: { files: [] },
+      message: `No file found matching ${getMatcherDescription(fileMatcher)}`
     };
   }
+
+  // 检查文件内容
+  for (const file of matchedFiles) {
+    const fullPath = path.join(workDir, file);
+    const content = await fs.readFile(fullPath, 'utf-8');
+
+    if (matchValue(content, textMatcher)) {
+      return {
+        type: 'file_content_contains',
+        value: assertion,
+        passed: true,
+        actual: { file, content: content.substring(0, 200) },
+        message: `Content ${getMatcherDescription(textMatcher)} found in '${file}'`
+      };
+    }
+  }
+
+  // 所有匹配文件都不包含指定内容
+  const firstFileContent = await fs.readFile(path.join(workDir, matchedFiles[0]), 'utf-8');
+
+  return {
+    type: 'file_content_contains',
+    value: assertion,
+    passed: false,
+    actual: {
+      file: matchedFiles[0],
+      content: firstFileContent.substring(0, 200)
+    },
+    message: `Content ${getMatcherDescription(textMatcher)} not found in any matching file`
+  };
 }
 
 /**
- * Verify that the response contains specific text
+ * Verify that the response contains specific text with Matcher support
  */
 export function verifyResponseContains(
   outputs: OpenCodeRunOutput[],
-  text: string
+  assertion: string | Matcher
 ): AssertionResult {
-  // Check both new format (part.text) and legacy format (data.content)
-  const textOutputs = outputs.filter(output => {
-    // New format: type: "text", part.text
-    if (output.type === 'text' && output.part?.text) {
-      return true;
-    }
-    // Legacy format: type: "text", data.content
-    if (output.data?.content) {
-      return true;
-    }
-    return false;
-  });
+  // 字符串参数默认使用 contains 匹配（保持向后兼容）
+  const matcher: Matcher = typeof assertion === 'string'
+    ? { contains: assertion }
+    : assertion;
 
-  const found = textOutputs.some(output => {
-    // New format
-    if (output.part?.text) {
-      return output.part.text.includes(text);
-    }
-    // Legacy format
-    if (output.data?.content) {
-      return output.data.content.includes(text);
-    }
-    return false;
-  });
+  // 收集所有文本响应（同时支持 part.text 和 data.content 格式）
+  const responses = outputs
+    .filter(o => o.type === 'text')
+    .map(o => o.part?.text || o.data?.content || '');
 
-  if (found) {
-    return {
-      type: 'response_contains',
-      value: text,
-      passed: true,
-      message: `Text '${text}' found in response`
-    };
-  }
+  // 检查是否有匹配的响应
+  const matches = responses.filter(r => r && matchValue(r, matcher));
+
+  const passed = matches.length > 0;
 
   return {
     type: 'response_contains',
-    value: text,
-    passed: false,
-    message: `Text '${text}' not found in response`
+    value: assertion,
+    passed,
+    actual: { responses: matches },
+    message: passed
+      ? `Found response ${getMatcherDescription(matcher)}`
+      : `No response found matching ${getMatcherDescription(matcher)}`
   };
 }
 
@@ -333,72 +388,15 @@ export async function verifyAssertions(
     }
 
     if ('should_produce_file' in assertion) {
-      const value = assertion.should_produce_file;
-      if (isString(value)) {
-        results.push(await verifyShouldProduceFile(workDir, value));
-      } else if (isMatcher(value)) {
-        // Matcher mode: will be implemented in Task 4
-        results.push({
-          type: 'should_produce_file',
-          value: value,
-          passed: false,
-          message: 'should_produce_file with Matcher is not yet implemented'
-        });
-      } else {
-        results.push({
-          type: 'should_produce_file',
-          value: value,
-          passed: false,
-          message: 'Invalid should_produce_file assertion value'
-        });
-      }
+      results.push(await verifyShouldProduceFile(workDir, assertion.should_produce_file));
     }
 
     if ('file_content_contains' in assertion) {
-      const assertionValue = assertion.file_content_contains;
-      if ('file' in assertionValue && 'text' in assertionValue) {
-        const { file, text } = assertionValue;
-        if (isString(file) && isString(text)) {
-          results.push(await verifyFileContentContains(workDir, file, text));
-        } else if (isMatcher(file) || isMatcher(text)) {
-          // Matcher mode: will be implemented in Task 5
-          results.push({
-            type: 'file_content_contains',
-            value: { file, text } as FileContentAssertion,
-            passed: false,
-            message: 'file_content_contains with Matcher is not yet implemented'
-          });
-        } else {
-          results.push({
-            type: 'file_content_contains',
-            value: { file, text },
-            passed: false,
-            message: 'Invalid file_content_contains assertion value'
-          });
-        }
-      }
+      results.push(await verifyFileContentContains(workDir, assertion.file_content_contains));
     }
 
     if ('response_contains' in assertion) {
-      const value = assertion.response_contains;
-      if (isString(value)) {
-        results.push(verifyResponseContains(outputs, value));
-      } else if (isMatcher(value)) {
-        // Matcher mode: will be implemented in Task 6
-        results.push({
-          type: 'response_contains',
-          value: value,
-          passed: false,
-          message: 'response_contains with Matcher is not yet implemented'
-        });
-      } else {
-        results.push({
-          type: 'response_contains',
-          value: value,
-          passed: false,
-          message: 'Invalid response_contains assertion value'
-        });
-      }
+      results.push(verifyResponseContains(outputs, assertion.response_contains));
     }
   }
 
