@@ -90,9 +90,8 @@ class Logger {
    * 进度指示器（动画效果）
    */
   showProgress(scenarioName: string, message: string): void {
-    const prefix = `[${scenarioName}]`;
     // 使用 \r 回到行首，覆盖之前的内容
-    process.stdout.write(`\r${chalk.yellow(prefix)} ⏳ ${message}`);
+    process.stdout.write(`\r[${chalk.gray(scenarioName)}] ${chalk.yellow('⏳')} ${message}`);
   }
 
   /**
