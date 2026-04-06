@@ -32,11 +32,44 @@ export interface StepConfig {
   timeout?: number;
 }
 
+// ========== Matcher Types ==========
+
+/**
+ * Matcher 对象支持多种匹配模式
+ * - equals: 精确匹配
+ * - contains: 包含匹配（字符串）
+ * - regex: 正则匹配
+ * - oneOf: 候选值匹配
+ */
+export interface Matcher {
+  equals?: string;
+  contains?: string;
+  regex?: string;
+  oneOf?: string[];
+}
+
+/**
+ * 工具调用断言，支持 Matcher 模式
+ */
+export interface ToolCallAssertion {
+  name: string | Matcher;
+  input?: Record<string, string | Matcher>;
+  status?: 'completed' | 'error' | 'pending';
+}
+
+/**
+ * 文件内容断言，支持 Matcher 模式
+ */
+export interface FileContentAssertion {
+  file: string | Matcher;
+  text: string | Matcher;
+}
+
 export type Assertion =
-  | { should_call_tool: string }
-  | { should_produce_file: string }
-  | { file_content_contains: { file: string; text: string } }
-  | { response_contains: string };
+  | { should_call_tool: string | ToolCallAssertion }
+  | { should_produce_file: string | Matcher }
+  | { file_content_contains: { file: string; text: string } | FileContentAssertion }
+  | { response_contains: string | Matcher };
 
 export interface GlobalConfig {
   default_timeout?: number;
@@ -167,9 +200,17 @@ export interface StepResult {
 
 export interface AssertionResult {
   type: string;
-  value: string | { file: string; text: string };
+  value: string | Matcher | ToolCallAssertion | FileContentAssertion | { file: string; text: string };
   passed: boolean;
-  actual?: string;
+  actual?: {
+    tool?: string;
+    input?: Record<string, unknown>;
+    status?: string;
+    content?: string;
+    file?: string;
+    files?: string[];
+    responses?: string[];
+  };
   message?: string;
 }
 

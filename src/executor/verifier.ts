@@ -1,6 +1,42 @@
 import fs from 'fs-extra';
 import * as path from 'path';
-import { type Assertion, type OpenCodeRunOutput, type AssertionResult } from '../types/index.js';
+import {
+  type Assertion,
+  type OpenCodeRunOutput,
+  type AssertionResult,
+  type Matcher,
+  type ToolCallAssertion,
+  type FileContentAssertion
+} from '../types/index.js';
+
+/**
+ * Type guard to check if a value is a string
+ */
+function isString(value: unknown): value is string {
+  return typeof value === 'string';
+}
+
+/**
+ * Type guard to check if a value is a Matcher object
+ */
+function isMatcher(value: unknown): value is Matcher {
+  return typeof value === 'object' && value !== null &&
+    ('equals' in value || 'contains' in value || 'regex' in value || 'oneOf' in value);
+}
+
+/**
+ * Type guard to check if a value is a ToolCallAssertion object
+ */
+function isToolCallAssertion(value: unknown): value is ToolCallAssertion {
+  return typeof value === 'object' && value !== null && 'name' in value;
+}
+
+/**
+ * Type guard to check if a value is a FileContentAssertion object
+ */
+function isFileContentAssertion(value: unknown): value is FileContentAssertion {
+  return typeof value === 'object' && value !== null && 'file' in value && 'text' in value;
+}
 
 /**
  * Verify that a specific tool was called in the outputs
@@ -183,20 +219,94 @@ export async function verifyAssertions(
 
   for (const assertion of assertions) {
     if ('should_call_tool' in assertion) {
-      results.push(verifyShouldCallTool(outputs, assertion.should_call_tool));
+      const value = assertion.should_call_tool;
+      if (isString(value)) {
+        results.push(verifyShouldCallTool(outputs, value));
+      } else if (isToolCallAssertion(value)) {
+        // Matcher mode: will be implemented in Task 3
+        results.push({
+          type: 'should_call_tool',
+          value: value,
+          passed: false,
+          message: 'ToolCallAssertion with Matcher is not yet implemented'
+        });
+      } else {
+        results.push({
+          type: 'should_call_tool',
+          value: value,
+          passed: false,
+          message: 'Invalid should_call_tool assertion value'
+        });
+      }
     }
 
     if ('should_produce_file' in assertion) {
-      results.push(await verifyShouldProduceFile(workDir, assertion.should_produce_file));
+      const value = assertion.should_produce_file;
+      if (isString(value)) {
+        results.push(await verifyShouldProduceFile(workDir, value));
+      } else if (isMatcher(value)) {
+        // Matcher mode: will be implemented in Task 4
+        results.push({
+          type: 'should_produce_file',
+          value: value,
+          passed: false,
+          message: 'should_produce_file with Matcher is not yet implemented'
+        });
+      } else {
+        results.push({
+          type: 'should_produce_file',
+          value: value,
+          passed: false,
+          message: 'Invalid should_produce_file assertion value'
+        });
+      }
     }
 
     if ('file_content_contains' in assertion) {
-      const { file, text } = assertion.file_content_contains;
-      results.push(await verifyFileContentContains(workDir, file, text));
+      const assertionValue = assertion.file_content_contains;
+      if ('file' in assertionValue && 'text' in assertionValue) {
+        const { file, text } = assertionValue;
+        if (isString(file) && isString(text)) {
+          results.push(await verifyFileContentContains(workDir, file, text));
+        } else if (isMatcher(file) || isMatcher(text)) {
+          // Matcher mode: will be implemented in Task 5
+          results.push({
+            type: 'file_content_contains',
+            value: { file, text } as FileContentAssertion,
+            passed: false,
+            message: 'file_content_contains with Matcher is not yet implemented'
+          });
+        } else {
+          results.push({
+            type: 'file_content_contains',
+            value: { file, text },
+            passed: false,
+            message: 'Invalid file_content_contains assertion value'
+          });
+        }
+      }
     }
 
     if ('response_contains' in assertion) {
-      results.push(verifyResponseContains(outputs, assertion.response_contains));
+      const value = assertion.response_contains;
+      if (isString(value)) {
+        results.push(verifyResponseContains(outputs, value));
+      } else if (isMatcher(value)) {
+        // Matcher mode: will be implemented in Task 6
+        results.push({
+          type: 'response_contains',
+          value: value,
+          passed: false,
+          message: 'response_contains with Matcher is not yet implemented'
+        });
+      } else {
+        results.push({
+          type: 'response_contains',
+          value: value,
+          passed: false,
+          message: 'Invalid response_contains assertion value'
+        });
+      }
     }
   }
 
