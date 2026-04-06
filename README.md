@@ -66,8 +66,10 @@ environments:
   default:
     directory: ./fixtures/test-env
     setup:
-      - copy: ./templates/base
+      - copy: "./templates/base -> $WORKDIR/"
+      - copy: "./skills/my-skill.md -> $WORKDIR/.opencode/agents/"
       - run: npm install
+    agent: "my-skill"  # 可选，显式指定 agent 名称
 
 scenarios:
   - name: create-file
@@ -80,15 +82,34 @@ scenarios:
           - should_produce_file: hello.txt
         timeout: 60000
 
-      - input: "读取 hello.txt 内容"
-        expected:
-          - should_call_tool: Read
-          - response_contains: "hello"
-
 config:
   default_timeout: 120000
   parallel: false
 ```
+
+### setup.copy 配置
+
+`setup.copy` 使用 `source -> target` 格式：
+
+- `source`: 复制源路径，相对于 YAML 文件
+- `target`: 复制目标路径，支持 `$WORKDIR` 变量
+
+**$WORKDIR 变量**：表示测试执行的临时工作目录。例如：
+
+```yaml
+setup:
+  - copy: "./skills/skill.md -> $WORKDIR/.opencode/agents/"
+```
+
+会将 skill.md 复制到临时工作目录的 `.opencode/agents/` 下。
+
+### agent 名称推导
+
+agent 名称按以下优先级确定：
+
+1. CLI `--agent` 参数
+2. 环境 `agent` 字段显式指定
+3. 从复制到 `.opencode/agents/` 的文件名推导
 
 ## 断言类型
 
