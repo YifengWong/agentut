@@ -235,6 +235,53 @@ Matcher 模式的断言结果会包含实际值，便于调试：
 }
 ```
 
+## Agent CLI 配置
+
+Agent VCR 支持配置自定义 CLI 命令名，适用于企业环境封装场景。在 YAML 测试文件的 `config.agent_cli` 中配置：
+
+```yaml
+name: my-test-suite
+config:
+  agent_cli:
+    runner: opencode      # Agent 类型 (opencode, claude, gemini)
+    command: mycode       # 实际执行的 CLI 命令名
+```
+
+### 默认值
+
+若未配置 `agent_cli`，默认使用：
+```yaml
+agent_cli:
+  runner: opencode
+  command: opencode
+```
+
+### suggest 命令配置
+
+`suggest` 命令需要 YAML 配置文件来获取 runner 配置：
+
+```bash
+# 创建最小配置文件
+cat > config.yaml << EOF
+name: my-project
+config:
+  agent_cli:
+    runner: opencode
+    command: mycode
+EOF
+
+# 使用配置文件生成测试
+agentvcr suggest config.yaml --latest -o tests/my-test.yaml
+agentvcr suggest config.yaml -s ses_xxx -o tests/my-test.yaml
+```
+
+### 未来扩展
+
+`runner` 字段预留支持其他 Agent CLI：
+- `opencode` — 当前支持
+- `claude` — 未来支持
+- `gemini` — 未来支持
+
 ## CLI 命令
 
 ### agentvcr init
@@ -247,11 +294,21 @@ agentvcr init [directory] [--with-example]
 
 ### agentvcr suggest
 
-从 opencode session 生成测试用例。
+从 opencode session 生成测试用例（需要 YAML 配置文件）。
 
 ```bash
-agentvcr suggest [sessionId] [--latest] [-o file] [--skill name] [--name name]
+agentvcr suggest <testFile> [-s sessionId] [--latest] [-o file] [--skill name] [--name name]
 ```
+
+**参数**：
+- `<testFile>` — YAML 配置文件路径（包含 agent_cli 配置）
+
+**选项**：
+- `-s, --session <sessionId>` — 指定 Session ID
+- `--latest` — 使用最近的 session
+- `-o, --output <file>` — 输出到文件
+- `--skill <name>` — 目标 Skill 名称
+- `--name <name>` — 测试套件名称
 
 ### agentvcr run
 
