@@ -37,16 +37,17 @@ program
 
 // suggest command
 program
-  .command('suggest [sessionId]')
-  .description('Generate test case suggestion from session')
+  .command('suggest <testFile>')
+  .description('Generate test case suggestion from session (reads runner config from YAML)')
+  .option('-s, --session <sessionId>', 'Session ID to analyze')
   .option('--latest', 'Use the most recent session')
   .option('-o, --output <file>', 'Output file path')
   .option('--skill <name>', 'Target skill name')
   .option('--name <name>', 'Test suite name')
-  .action(async (sessionId, options) => {
+  .action(async (testFile, options) => {
     try {
-      const yaml = await suggestTest({
-        sessionId,
+      const yaml = await suggestTest(testFile, {
+        session: options.session,
         latest: options.latest,
         output: options.output,
         skill: options.skill,
