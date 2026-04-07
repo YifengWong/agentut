@@ -11,8 +11,8 @@ vi.mock('../../src/parser/yaml.js', () => ({
   parseAndValidateYaml: vi.fn()
 }));
 
-vi.mock('../../src/executor/opencode.js', () => ({
-  runOpenCode: vi.fn()
+vi.mock('../../src/runner/factory.js', () => ({
+  createRunner: vi.fn()
 }));
 
 vi.mock('../../src/executor/fixture.js', () => ({
@@ -43,15 +43,26 @@ vi.mock('../../src/output/logger.js', () => ({
 }));
 
 import { parseAndValidateYaml } from '../../src/parser/yaml.js';
-import { runOpenCode } from '../../src/executor/opencode.js';
+import { createRunner } from '../../src/runner/factory.js';
 import { prepareEnvironment, cleanupEnvironment } from '../../src/executor/fixture.js';
 import { verifyAssertions } from '../../src/executor/verifier.js';
 import { logger } from '../../src/output/logger.js';
 
 describe('run command', () => {
+  const mockRunner = {
+    runnerType: 'opencode',
+    run: vi.fn(),
+    exportSession: vi.fn(),
+    listSessions: vi.fn()
+  };
+
   beforeEach(async () => {
     vi.clearAllMocks();
     await fs.ensureDir(TEST_DIR);
+
+    // Setup mock runner
+    vi.mocked(createRunner).mockReturnValue(mockRunner as any);
+    mockRunner.run.mockClear();
   });
 
   afterEach(async () => {
@@ -73,12 +84,15 @@ describe('run command', () => {
           expected: [{ should_call_tool: 'Write' }],
           timeout: 60000
         }]
-      }]
+      }],
+      config: {
+        agent_cli: { runner: 'opencode', command: 'opencode' }
+      }
     };
 
     vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
     vi.mocked(prepareEnvironment).mockResolvedValue({ tempDirectory: '/tmp/test' });
-    vi.mocked(runOpenCode).mockReturnValue({
+    mockRunner.run.mockReturnValue({
       outputs: [{ type: 'tool_call', data: { tool_name: 'Write' }, session_id: 'ses_1', timestamp: 1 }],
       sessionId: 'ses_1'
     });
@@ -105,7 +119,10 @@ describe('run command', () => {
       scenarios: [
         { name: 'scenario-1', environment: 'default', cleanup: true, steps: [] },
         { name: 'scenario-2', environment: 'default', cleanup: true, steps: [] }
-      ]
+      ],
+      config: {
+        agent_cli: { runner: 'opencode', command: 'opencode' }
+      }
     };
 
     vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
@@ -132,7 +149,10 @@ describe('run command', () => {
         environment: 'default',
         cleanup: true,
         steps: []
-      }]
+      }],
+      config: {
+        agent_cli: { runner: 'opencode', command: 'opencode' }
+      }
     };
 
     vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
@@ -158,7 +178,10 @@ describe('run command', () => {
         environment: 'default',
         cleanup: false,
         steps: []
-      }]
+      }],
+      config: {
+        agent_cli: { runner: 'opencode', command: 'opencode' }
+      }
     };
 
     vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
@@ -189,12 +212,15 @@ describe('run command', () => {
           expected: [],  // empty assertions
           timeout: 60000
         }]
-      }]
+      }],
+      config: {
+        agent_cli: { runner: 'opencode', command: 'opencode' }
+      }
     };
 
     vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
     vi.mocked(prepareEnvironment).mockResolvedValue({ tempDirectory: '/tmp/test' });
-    vi.mocked(runOpenCode).mockReturnValue({
+    vi.mocked(mockRunner.run).mockReturnValue({
       outputs: [{ type: 'text', data: { content: 'Answer' }, session_id: 'ses_1', timestamp: 1 }],
       sessionId: 'ses_1'
     });
@@ -221,7 +247,10 @@ describe('run command', () => {
         scenarios: [
           { name: 'scenario-1', environment: 'default', cleanup: true, steps: [] },
           { name: 'scenario-2', environment: 'default', cleanup: true, steps: [] }
-        ]
+        ],
+        config: {
+          agent_cli: { runner: 'opencode', command: 'opencode' }
+        }
       };
 
       vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
@@ -245,7 +274,10 @@ describe('run command', () => {
         scenarios: [
           { name: 'first-scenario', environment: 'default', cleanup: true, steps: [] },
           { name: 'second-scenario', environment: 'default', cleanup: true, steps: [] }
-        ]
+        ],
+        config: {
+          agent_cli: { runner: 'opencode', command: 'opencode' }
+        }
       };
 
       vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
@@ -280,12 +312,15 @@ describe('run command', () => {
             { input: 'Step 1', expected: [{ should_call_tool: 'Write' }], timeout: 60000 },
             { input: 'Step 2', expected: [{ should_call_tool: 'Read' }], timeout: 60000 }
           ]
-        }]
+        }],
+        config: {
+          agent_cli: { runner: 'opencode', command: 'opencode' }
+        }
       };
 
       vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
       vi.mocked(prepareEnvironment).mockResolvedValue({ tempDirectory: '/tmp/test' });
-      vi.mocked(runOpenCode).mockReturnValue({
+      vi.mocked(mockRunner.run).mockReturnValue({
         outputs: [{ type: 'tool_call', data: { tool_name: 'Write' }, session_id: 'ses_1', timestamp: 1 }],
         sessionId: 'ses_1'
       });
@@ -326,12 +361,15 @@ describe('run command', () => {
             expected: [],
             timeout: 60000
           }]
-        }]
+        }],
+        config: {
+          agent_cli: { runner: 'opencode', command: 'opencode' }
+        }
       };
 
       vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
       vi.mocked(prepareEnvironment).mockResolvedValue({ tempDirectory: '/tmp/test' });
-      vi.mocked(runOpenCode).mockImplementation(() => {
+      vi.mocked(mockRunner.run).mockImplementation(() => {
         throw new Error('Execution failed');
       });
 
@@ -352,7 +390,10 @@ describe('run command', () => {
         },
         scenarios: [
           { name: 'passed-scenario', environment: 'default', cleanup: true, steps: [] }
-        ]
+        ],
+        config: {
+          agent_cli: { runner: 'opencode', command: 'opencode' }
+        }
       };
 
       vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
@@ -382,12 +423,15 @@ describe('run command', () => {
             expected: [{ should_call_tool: 'Write' }],
             timeout: 60000
           }]
-        }]
+        }],
+        config: {
+          agent_cli: { runner: 'opencode', command: 'opencode' }
+        }
       };
 
       vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
       vi.mocked(prepareEnvironment).mockResolvedValue({ tempDirectory: '/tmp/test' });
-      vi.mocked(runOpenCode).mockReturnValue({
+      vi.mocked(mockRunner.run).mockReturnValue({
         outputs: [{ type: 'tool_call', data: { tool_name: 'Read' }, session_id: 'ses_1', timestamp: 1 }],
         sessionId: 'ses_1'
       });
@@ -414,7 +458,10 @@ describe('run command', () => {
           environment: 'default',
           cleanup: true,
           steps: []
-        }]
+        }],
+        config: {
+          agent_cli: { runner: 'opencode', command: 'opencode' }
+        }
       };
 
       vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
@@ -427,6 +474,127 @@ describe('run command', () => {
       await runTests(yamlPath);
 
       expect(cleanupEnvironment).toHaveBeenCalledWith('/tmp/test', true, 'my-scenario');
+    });
+  });
+
+  // Runner integration tests
+  describe('runner integration', () => {
+    it('should create runner from suite config', async () => {
+      const mockSuite: YamlTestSuite = {
+        name: 'test',
+        environments: { default: { directory: './test', setup: [] } },
+        scenarios: [{
+          name: 'scenario-1',
+          environment: 'default',
+          cleanup: true,
+          steps: [{ input: 'Test', expected: [], timeout: 60000 }]
+        }],
+        config: {
+          agent_cli: { runner: 'opencode', command: 'mycode' }
+        }
+      };
+
+      vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
+      vi.mocked(prepareEnvironment).mockResolvedValue({ tempDirectory: '/tmp/test' });
+      mockRunner.run.mockReturnValue({
+        outputs: [],
+        sessionId: 'ses_1'
+      });
+
+      const yamlPath = path.join(TEST_DIR, 'test.yaml');
+      await fs.writeFile(yamlPath, 'name: test');
+
+      await runTests(yamlPath);
+
+      expect(createRunner).toHaveBeenCalledWith({
+        runner: 'opencode',
+        command: 'mycode'
+      });
+    });
+
+    it('should call runner.run with correct options', async () => {
+      const mockSuite: YamlTestSuite = {
+        name: 'test',
+        environments: { default: { directory: './test', setup: [] } },
+        scenarios: [{
+          name: 'scenario-1',
+          environment: 'default',
+          cleanup: true,
+          steps: [{ input: 'Test input', expected: [], timeout: 30000 }]
+        }],
+        config: {
+          agent_cli: { runner: 'opencode', command: 'opencode' }
+        }
+      };
+
+      vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
+      vi.mocked(prepareEnvironment).mockResolvedValue({ tempDirectory: '/tmp/test-dir' });
+      mockRunner.run.mockReturnValue({
+        outputs: [],
+        sessionId: 'ses_1'
+      });
+
+      const yamlPath = path.join(TEST_DIR, 'test.yaml');
+      await fs.writeFile(yamlPath, 'name: test');
+
+      await runTests(yamlPath);
+
+      expect(mockRunner.run).toHaveBeenCalledWith({
+        input: 'Test input',
+        directory: '/tmp/test-dir',
+        sessionId: undefined,
+        fork: false,
+        timeout: 30000,
+        model: undefined,
+        agent: undefined
+      });
+    });
+
+    it('should pass sessionId to runner.run for subsequent steps', async () => {
+      const mockSuite: YamlTestSuite = {
+        name: 'test',
+        environments: { default: { directory: './test', setup: [] } },
+        scenarios: [{
+          name: 'multi-step',
+          environment: 'default',
+          cleanup: true,
+          steps: [
+            { input: 'Step 1', expected: [], timeout: 60000 },
+            { input: 'Step 2', expected: [], timeout: 60000 }
+          ]
+        }],
+        config: {
+          agent_cli: { runner: 'opencode', command: 'opencode' }
+        }
+      };
+
+      vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
+      vi.mocked(prepareEnvironment).mockResolvedValue({ tempDirectory: '/tmp/test' });
+
+      let callCount = 0;
+      mockRunner.run.mockImplementation(() => {
+        callCount++;
+        return {
+          outputs: [],
+          sessionId: `ses_${callCount}`
+        };
+      });
+
+      const yamlPath = path.join(TEST_DIR, 'test.yaml');
+      await fs.writeFile(yamlPath, 'name: test');
+
+      await runTests(yamlPath);
+
+      // First call should have no sessionId, second should have sessionId from first call
+      expect(mockRunner.run).toHaveBeenCalledTimes(2);
+      expect(mockRunner.run).toHaveBeenNthCalledWith(1, expect.objectContaining({
+        sessionId: undefined,
+        fork: false
+      }));
+      expect(mockRunner.run).toHaveBeenNthCalledWith(2, expect.objectContaining({
+        sessionId: 'ses_1',
+        fork: true
+      }));
     });
   });
 });

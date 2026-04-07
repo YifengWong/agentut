@@ -1,7 +1,7 @@
 import fs from 'fs-extra';
 import * as path from 'path';
 import { parseAndValidateYaml } from '../parser/yaml.js';
-import { runOpenCode } from '../executor/opencode.js';
+import { createRunner } from '../runner/factory.js';
 import { prepareEnvironment, cleanupEnvironment } from '../executor/fixture.js';
 import { verifyAssertions } from '../executor/verifier.js';
 import { generateTestResult } from '../output/json.js';
@@ -142,6 +142,9 @@ async function executeScenario(
     agent = suite.config.target.agent;
   }
 
+  // Create runner from suite config
+  const runner = createRunner(suite.config!.agent_cli!);
+
   try {
     // Prepare environment
     const envResult = await prepareEnvironment(envConfig, scenario.name, tempRoot, {
@@ -163,7 +166,7 @@ async function executeScenario(
 
       try {
         // Run opencode
-        const runResult = runOpenCode({
+        const runResult = runner.run({
           input: step.input,
           directory: tempDirectory,
           sessionId,
