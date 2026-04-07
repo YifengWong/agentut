@@ -5,25 +5,49 @@ import { suggestTest } from '../../src/commands/suggest.js';
 
 const TEST_DIR = './test-temp-suggest';
 
-vi.mock('../../src/executor/opencode.js', () => ({
-  exportSession: vi.fn(),
-  getLatestSessionId: vi.fn()
+vi.mock('../../src/runner/factory.js', () => ({
+  createRunner: vi.fn()
 }));
 
-import { exportSession, getLatestSessionId } from '../../src/executor/opencode.js';
+vi.mock('../../src/parser/yaml.js', () => ({
+  parseAndValidateYaml: vi.fn()
+}));
+
+import { createRunner } from '../../src/runner/factory.js';
+import { parseAndValidateYaml } from '../../src/parser/yaml.js';
 
 describe('suggest command', () => {
+  const mockRunner = {
+    runnerType: 'opencode',
+    run: vi.fn(),
+    exportSession: vi.fn(),
+    listSessions: vi.fn()
+  };
+
   beforeEach(async () => {
     vi.clearAllMocks();
     await fs.ensureDir(TEST_DIR);
+    vi.mocked(createRunner).mockReturnValue(mockRunner as any);
   });
 
   afterEach(async () => {
     await fs.remove(TEST_DIR);
   });
 
-  it('should generate YAML from session ID', async () => {
-    vi.mocked(exportSession).mockResolvedValue({
+  it('should read YAML config and create runner', async () => {
+    const mockSuite = {
+      name: 'test-project',
+      environments: {
+        default: {
+          directory: '/test',
+          setup: []
+        }
+      },
+      scenarios: [],
+      config: { agent_cli: { runner: 'opencode', command: 'mycode' } }
+    };
+    vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite as any);
+    vi.mocked(mockRunner.exportSession).mockResolvedValue({
       info: {
         id: 'ses_123',
         slug: 'test',
@@ -42,17 +66,33 @@ describe('suggest command', () => {
       ]
     });
 
-    const yaml = await suggestTest({ sessionId: 'ses_123' });
+    const yamlPath = path.join(TEST_DIR, 'config.yaml');
+    await fs.writeFile(yamlPath, 'name: test');
 
-    expect(exportSession).toHaveBeenCalledWith('ses_123');
+    const yaml = await suggestTest(yamlPath, { session: 'ses_123' });
+
+    expect(createRunner).toHaveBeenCalledWith({ runner: 'opencode', command: 'mycode' });
+    expect(mockRunner.exportSession).toHaveBeenCalledWith('ses_123');
     expect(yaml).toContain('name:');
     expect(yaml).toContain('scenarios:');
     expect(yaml).toContain('Create file');
   });
 
   it('should use latest session when --latest flag is set', async () => {
-    vi.mocked(getLatestSessionId).mockResolvedValue('ses_latest');
-    vi.mocked(exportSession).mockResolvedValue({
+    const mockSuite = {
+      name: 'test-project',
+      environments: {
+        default: {
+          directory: '/test',
+          setup: []
+        }
+      },
+      scenarios: [],
+      config: { agent_cli: { runner: 'opencode', command: 'opencode' } }
+    };
+    vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite as any);
+    vi.mocked(mockRunner.listSessions).mockResolvedValue([{ id: 'ses_latest' }]);
+    vi.mocked(mockRunner.exportSession).mockResolvedValue({
       info: {
         id: 'ses_latest',
         slug: 'latest',
@@ -66,14 +106,29 @@ describe('suggest command', () => {
       messages: []
     });
 
-    await suggestTest({ latest: true });
+    const yamlPath = path.join(TEST_DIR, 'config.yaml');
+    await fs.writeFile(yamlPath, 'name: test');
 
-    expect(getLatestSessionId).toHaveBeenCalled();
-    expect(exportSession).toHaveBeenCalledWith('ses_latest');
+    await suggestTest(yamlPath, { latest: true });
+
+    expect(mockRunner.listSessions).toHaveBeenCalled();
+    expect(mockRunner.exportSession).toHaveBeenCalledWith('ses_latest');
   });
 
   it('should write to output file when specified', async () => {
-    vi.mocked(exportSession).mockResolvedValue({
+    const mockSuite = {
+      name: 'test-project',
+      environments: {
+        default: {
+          directory: '/test',
+          setup: []
+        }
+      },
+      scenarios: [],
+      config: { agent_cli: { runner: 'opencode', command: 'opencode' } }
+    };
+    vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite as any);
+    vi.mocked(mockRunner.exportSession).mockResolvedValue({
       info: {
         id: 'ses_123',
         slug: 'test',
@@ -87,8 +142,11 @@ describe('suggest command', () => {
       messages: []
     });
 
+    const yamlPath = path.join(TEST_DIR, 'config.yaml');
+    await fs.writeFile(yamlPath, 'name: test');
+
     const outputPath = path.join(TEST_DIR, 'output.yaml');
-    await suggestTest({ sessionId: 'ses_123', output: outputPath });
+    await suggestTest(yamlPath, { session: 'ses_123', output: outputPath });
 
     expect(await fs.pathExists(outputPath)).toBe(true);
     const content = await fs.readFile(outputPath, 'utf-8');
@@ -96,7 +154,19 @@ describe('suggest command', () => {
   });
 
   it('should use custom test name when --name is specified', async () => {
-    vi.mocked(exportSession).mockResolvedValue({
+    const mockSuite = {
+      name: 'test-project',
+      environments: {
+        default: {
+          directory: '/test',
+          setup: []
+        }
+      },
+      scenarios: [],
+      config: { agent_cli: { runner: 'opencode', command: 'opencode' } }
+    };
+    vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite as any);
+    vi.mocked(mockRunner.exportSession).mockResolvedValue({
       info: {
         id: 'ses_123',
         slug: 'test',
@@ -110,8 +180,40 @@ describe('suggest command', () => {
       messages: []
     });
 
-    const yaml = await suggestTest({ sessionId: 'ses_123', name: 'my-custom-test' });
+    const yamlPath = path.join(TEST_DIR, 'config.yaml');
+    await fs.writeFile(yamlPath, 'name: test');
+
+    const yaml = await suggestTest(yamlPath, { session: 'ses_123', name: 'my-custom-test' });
 
     expect(yaml).toContain('name: my-custom-test');
+  });
+
+  it('should throw error when test file not found', async () => {
+    const yamlPath = path.join(TEST_DIR, 'nonexistent.yaml');
+
+    await expect(suggestTest(yamlPath, { session: 'ses_123' }))
+      .rejects.toThrow('Test file not found');
+  });
+
+  it('should throw error when no sessions found with --latest', async () => {
+    const mockSuite = {
+      name: 'test-project',
+      environments: {
+        default: {
+          directory: '/test',
+          setup: []
+        }
+      },
+      scenarios: [],
+      config: { agent_cli: { runner: 'opencode', command: 'opencode' } }
+    };
+    vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite as any);
+    vi.mocked(mockRunner.listSessions).mockResolvedValue([]);
+
+    const yamlPath = path.join(TEST_DIR, 'config.yaml');
+    await fs.writeFile(yamlPath, 'name: test');
+
+    await expect(suggestTest(yamlPath, { latest: true }))
+      .rejects.toThrow('No sessions found');
   });
 });

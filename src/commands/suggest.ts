@@ -1,26 +1,40 @@
 import fs from 'fs-extra';
 import * as yaml from 'yaml';
-import { exportSession, getLatestSessionId } from '../executor/opencode.js';
+import { createRunner } from '../runner/factory.js';
+import { parseAndValidateYaml } from '../parser/yaml.js';
 import { analyzeSession, generateYamlFromAnalysis } from '../parser/session.js';
 import { ExecutionError } from '../types/index.js';
 
 export interface SuggestOptions {
-  sessionId?: string;
+  session?: string;
   latest?: boolean;
   output?: string;
   skill?: string;
   name?: string;
 }
 
-export async function suggestTest(options: SuggestOptions): Promise<string> {
+export async function suggestTest(testFile: string, options: SuggestOptions = {}): Promise<string> {
+  // Check if YAML file exists
+  if (!await fs.pathExists(testFile)) {
+    throw new ExecutionError(`Test file not found: ${testFile}`, testFile);
+  }
+
+  // Read and parse YAML to get runner config
+  const yamlContent = await fs.readFile(testFile, 'utf-8');
+  const suite = parseAndValidateYaml(yamlContent);
+
+  // Create runner from config
+  const runner = createRunner(suite.config!.agent_cli!);
+
   // Get session ID
-  let sessionId = options.sessionId;
+  let sessionId = options.session;
 
   if (options.latest) {
-    sessionId = await getLatestSessionId() || undefined;
-    if (!sessionId) {
+    const sessions = await runner.listSessions();
+    if (sessions.length === 0) {
       throw new ExecutionError('No sessions found. Run opencode first to create a session.', '');
     }
+    sessionId = sessions[0].id;
   }
 
   if (!sessionId) {
@@ -28,7 +42,7 @@ export async function suggestTest(options: SuggestOptions): Promise<string> {
   }
 
   // Export session
-  const session = await exportSession(sessionId);
+  const session = await runner.exportSession(sessionId);
 
   // Analyze and generate YAML
   const analysis = analyzeSession(session);
