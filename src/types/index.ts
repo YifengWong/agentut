@@ -71,9 +71,20 @@ export type Assertion =
   | { file_content_contains: { file: string; text: string } | FileContentAssertion }
   | { response_contains: string | Matcher };
 
+// ========== Agent CLI Configuration ==========
+
+/**
+ * Agent CLI 配置，支持自定义命令名和多 runner 支持
+ */
+export interface AgentCliConfig {
+  runner: 'opencode' | 'claude' | 'gemini';  // Agent 类型
+  command: string;                           // 实际执行的 CLI 命令名
+}
+
 export interface GlobalConfig {
   default_timeout?: number;
   parallel?: boolean;
+  agent_cli?: AgentCliConfig;  // 新增：Agent CLI 配置
   /** @deprecated Use environment.agent and setup.copy with $WORKDIR instead */
   target?: {
     skill?: string;
@@ -85,11 +96,15 @@ export interface GlobalConfig {
 // ========== Session Analysis Types ==========
 
 export interface ExportedSession {
-  info: SessionInfo;
+  info: OpenCodeSessionInfo;
   messages: Message[];
 }
 
-export interface SessionInfo {
+/**
+ * OpenCode 特有的详细会话信息结构
+ * 用于 exportSession() 返回的完整会话数据
+ */
+export interface OpenCodeSessionInfo {
   id: string;
   slug: string;
   projectID: string;
@@ -98,6 +113,17 @@ export interface SessionInfo {
   version: string;
   summary: SessionSummary;
   time: SessionTime;
+}
+
+/**
+ * 会话基本信息
+ * 用于 listSessions() 返回的会话列表项
+ */
+export interface SessionInfo {
+  id: string;
+  title?: string;
+  created?: number;
+  updated?: number;
 }
 
 export interface SessionSummary {

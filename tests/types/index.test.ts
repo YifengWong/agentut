@@ -4,7 +4,9 @@ import {
   ExecutionError,
   TimeoutError,
   SetupError,
-  type Assertion
+  type Assertion,
+  type AgentCliConfig,
+  type SessionInfo
 } from '../../src/types/index.js';
 
 describe('Error Classes', () => {
@@ -83,5 +85,52 @@ describe('Assertion Type', () => {
   it('should allow response_contains assertion', () => {
     const assertion: Assertion = { response_contains: 'success' };
     expect('response_contains' in assertion).toBe(true);
+  });
+});
+
+describe('AgentCliConfig type', () => {
+  it('should allow valid runner types', () => {
+    const config: AgentCliConfig = {
+      runner: 'opencode',
+      command: 'mycode'
+    };
+    expect(config.runner).toBe('opencode');
+    expect(config.command).toBe('mycode');
+  });
+
+  it('should allow claude as runner type (for future)', () => {
+    const config: AgentCliConfig = {
+      runner: 'claude',
+      command: 'claude'
+    };
+    expect(config.runner).toBe('claude');
+  });
+
+  it('should allow gemini as runner type (for future)', () => {
+    const config: AgentCliConfig = {
+      runner: 'gemini',
+      command: 'gemini'
+    };
+    expect(config.runner).toBe('gemini');
+  });
+});
+
+describe('SessionInfo type', () => {
+  it('should have required id field', () => {
+    const info: SessionInfo = {
+      id: 'ses_123'
+    };
+    expect(info.id).toBe('ses_123');
+  });
+
+  it('should allow optional fields', () => {
+    const info: SessionInfo = {
+      id: 'ses_123',
+      title: 'Test Session',
+      created: 1234567890,
+      updated: 1234567891
+    };
+    expect(info.title).toBe('Test Session');
+    expect(info.created).toBe(1234567890);
   });
 });
