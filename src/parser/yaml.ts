@@ -92,6 +92,15 @@ export function validateYamlTestSuite(suite: YamlTestSuite): void {
       }
     }
   }
+
+  // Set default agent_cli if not provided
+  if (!suite.config?.agent_cli) {
+    suite.config = suite.config || {};
+    suite.config.agent_cli = {
+      runner: 'opencode',
+      command: 'opencode'
+    };
+  }
 }
 
 export function parseAndValidateYaml(yamlString: string): YamlTestSuite {

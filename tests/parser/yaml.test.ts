@@ -264,6 +264,80 @@ describe('validateYamlTestSuite', () => {
   });
 });
 
+describe('agent_cli default value', () => {
+  it('should set default agent_cli when not provided', () => {
+    const suite: YamlTestSuite = {
+      name: 'test',
+      environments: {
+        default: { directory: './test', setup: [] }
+      },
+      scenarios: [{
+        name: 'scenario-1',
+        environment: 'default',
+        cleanup: true,
+        steps: [{
+          input: 'test',
+          expected: []
+        }]
+      }]
+    };
+    validateYamlTestSuite(suite);
+    expect(suite.config?.agent_cli?.runner).toBe('opencode');
+    expect(suite.config?.agent_cli?.command).toBe('opencode');
+  });
+
+  it('should preserve user-configured agent_cli', () => {
+    const suite: YamlTestSuite = {
+      name: 'test',
+      environments: {
+        default: { directory: './test', setup: [] }
+      },
+      scenarios: [{
+        name: 'scenario-1',
+        environment: 'default',
+        cleanup: true,
+        steps: [{
+          input: 'test',
+          expected: []
+        }]
+      }],
+      config: {
+        agent_cli: {
+          runner: 'opencode',
+          command: 'mycode'
+        }
+      }
+    };
+    validateYamlTestSuite(suite);
+    expect(suite.config?.agent_cli?.command).toBe('mycode');
+  });
+
+  it('should set agent_cli default even when other config fields exist', () => {
+    const suite: YamlTestSuite = {
+      name: 'test',
+      environments: {
+        default: { directory: './test', setup: [] }
+      },
+      scenarios: [{
+        name: 'scenario-1',
+        environment: 'default',
+        cleanup: true,
+        steps: [{
+          input: 'test',
+          expected: []
+        }]
+      }],
+      config: {
+        default_timeout: 90000
+      }
+    };
+    validateYamlTestSuite(suite);
+    expect(suite.config?.agent_cli?.runner).toBe('opencode');
+    expect(suite.config?.agent_cli?.command).toBe('opencode');
+    expect(suite.config?.default_timeout).toBe(90000);
+  });
+});
+
 describe('parseAndValidateYaml', () => {
   it('should parse and validate valid YAML', () => {
     const yaml = `
