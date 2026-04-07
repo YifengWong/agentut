@@ -17,15 +17,19 @@ cli/
 ├── src/
 │   ├── cli.ts                    # CLI 入口，命令分发
 │   ├── commands/
-│   │   ├── run.ts                # 执行测试命令
-│   │   ├── suggest.ts            # 智能推荐生成命令
+│   │   ├── run.ts                # 执行测试命令（使用 runner）
+│   │   ├── suggest.ts            # 智能推荐生成命令（读取 YAML config）
 │   │   ├── report.ts             # 报告生成命令
 │   │   └── init.ts               # 初始化目录命令
+│   ├── runner/                   # Agent Runner 抽象层（新增）
+│   │   ├── types.ts              # AgentRunner 接口定义
+│   │   ├── opencode.ts           # OpenCodeRunner 实现
+│   │   ├── factory.ts            # createRunner 工厂
+│   │   └── index.ts              # 模块导出
 │   ├── parser/
-│   │   ├── yaml.ts               # YAML 测试用例解析
+│   │   ├── yaml.ts               # YAML 测试用例解析（含 agent_cli 默认值）
 │   │   └── session.ts            # Session 数据解析（用于 suggest）
 │   ├── executor/
-│   │   ├── opencode.ts           # opencode CLI 调用封装
 │   │   ├── fixture.ts            # 测试环境管理（复制、清理）
 │   │   └── verifier.ts           # 断言验证执行
 │   ├── output/
@@ -35,7 +39,7 @@ cli/
 │   │       ├── markdown.ts       # Markdown 报告转换
 │   │       └── jest.ts           # Jest/Vitest 兼容格式
 │   └── types/
-│       └── index.ts              # 类型定义
+│       └ index.ts                # 类型定义（含 AgentCliConfig, SessionInfo）
 ├── tests/                        # 单元测试目录
 ├── SKILL.md                      # Skill 描述文档
 ├── README.md                     # 用户使用文档
@@ -57,13 +61,15 @@ cli/
 | 模块 | 职责 | 依赖 |
 |------|------|------|
 | `cli.ts` | 解析命令行参数，分发到对应 command | commands/* |
-| `commands/run.ts` | 加载 YAML，执行测试，输出结果 | parser/yaml, executor/*, output/json |
-| `commands/suggest.ts` | 导出 session，分析行为，生成 YAML | parser/session, executor/opencode |
+| `commands/run.ts` | 加载 YAML，执行测试，输出结果 | parser/yaml, runner/*, executor/*, output/json |
+| `commands/suggest.ts` | 导出 session，分析行为，生成 YAML | parser/yaml, parser/session, runner/* |
 | `commands/report.ts` | 读取 JSON 结果，转换格式输出 | output/formatters/* |
 | `commands/init.ts` | 创建目录结构，生成示例文件 | 无 |
-| `parser/yaml.ts` | 解析 YAML 测试用例文件，验证格式 | types |
+| `parser/yaml.ts` | 解析 YAML 测试用例文件，验证格式，设置默认值 | types |
 | `parser/session.ts` | 解析 opencode export JSON，提取关键信息 | types |
-| `executor/opencode.ts` | 封装 opencode CLI 调用（run、export、session list） | 无 |
+| `runner/types.ts` | 定义 AgentRunner 接口和运行时类型 | types |
+| `runner/opencode.ts` | OpenCode CLI 执行封装 | runner/types, types |
+| `runner/factory.ts` | Runner 实例创建工厂 | runner/opencode, types |
 | `executor/fixture.ts` | 环境复制、setup 执行、cleanup 清理 | 无 |
 | `executor/verifier.ts` | 执行断言验证，返回验证结果 | types |
 | `output/json.ts` | 生成 JSON 测试结果 | types |
@@ -76,11 +82,14 @@ cli.ts
   └── commands/
         ├── init.ts (独立)
         ├── suggest.ts
+        │     ├── parser/yaml.ts
         │     ├── parser/session.ts
-        │     └── executor/opencode.ts
+        │     └── runner/factory.ts
+        │           └── runner/opencode.ts
         ├── run.ts
         │     ├── parser/yaml.ts
-        │     ├── executor/opencode.ts
+        │     ├── runner/factory.ts
+        │     │     └── runner/opencode.ts
         │     ├── executor/fixture.ts
         │     ├── executor/verifier.ts
         │     └── output/json.ts
@@ -271,6 +280,33 @@ import * as fs from 'fs-extra';
 ```
 {tempRoot}/{scenarioId}-{runId}-{timestamp}
 ```
+
+## Agent CLI 配置
+
+### YAML 配置
+
+```yaml
+config:
+  agent_cli:
+    runner: opencode      # Agent 类型
+    command: mycode       # 自定义命令名
+```
+
+验证层自动设置默认值 `{ runner: 'opencode', command: 'opencode' }`。
+
+### Runner 抽象
+
+| Runner | CLI 格式 | 状态 |
+|--------|---------|------|
+| `opencode` | `opencode run/export/session` | 已实现 |
+| `claude` | 待定义 | 未实现 |
+| `gemini` | 待定义 | 未实现 |
+
+### 扩展新 Runner
+
+1. 在 `types/index.ts` 的 `AgentCliConfig.runner` 添加类型
+2. 创建 `runner/<name>.ts` 实现 `AgentRunner`
+3. 在 `factory.ts` 添加 case
 
 ## 扩展方向
 
