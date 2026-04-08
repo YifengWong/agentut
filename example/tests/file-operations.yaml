@@ -68,5 +68,8 @@ scenarios:
           - response_contains: "Test Content"
 
 config:
+  agent_cli:
+    runner: opencode      # Agent 类型 (opencode, claude, gemini)
+    command: opencode       # 实际执行的 CLI 命令名
   default_timeout: 120000
   parallel: false
