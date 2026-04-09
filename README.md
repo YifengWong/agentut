@@ -235,6 +235,52 @@ Matcher 模式的断言结果会包含实际值，便于调试：
 }
 ```
 
+## 概率性测试
+
+在 AI 时代，测试结果可能存在不确定性。Agent VCR 支持概率性测试，允许配置多次运行和通过阈值。
+
+### 配置
+
+```yaml
+config:
+  runs: 5          # 运行次数，默认 5
+  min_pass: 4      # 最少通过次数，默认 4（80%）
+
+scenarios:
+  - name: my-scenario
+    runs: 10       # 场景覆盖
+    min_pass: 8
+    steps:
+      - input: "创建文件"
+        expected:
+          - should_call_tool: Write
+            min_pass: 9  # 断言覆盖
+```
+
+### 配置优先级
+
+配置按以下优先级确定：
+1. CLI 参数（`--runs`, `--min-pass`）
+2. 场景级别配置
+3. 全局配置
+4. 默认值（runs=5, min_pass=4）
+
+### CLI 快速测试
+
+```bash
+# 快速单次测试（用于调试）
+agentvcr run ./tests/my-test.yaml --quick
+
+# 临时调整运行次数
+agentvcr run ./tests/my-test.yaml --runs 3 --min-pass 2
+```
+
+### 判定规则
+
+场景通过需满足两个条件：
+1. 场景整体通过次数 >= min_pass
+2. 每个断言的通过次数 >= 断言各自的 min_pass
+
 ## Agent CLI 配置
 
 Agent VCR 支持配置自定义 CLI 命令名，适用于企业环境封装场景。在 YAML 测试文件的 `config.agent_cli` 中配置：

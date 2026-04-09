@@ -1,0 +1,35 @@
+name: probabilistic-test-example
+description: 演示概率性测试通过率指标
+
+config:
+  runs: 5
+  min_pass: 4
+  default_timeout: 60000
+
+environments:
+  default:
+    directory: ./fixtures/empty
+    setup: []
+
+scenarios:
+  - name: basic-file-creation
+    environment: default
+    cleanup: true
+    steps:
+      - input: "创建一个名为 test.txt 的文件"
+        expected:
+          - should_call_tool: Write
+            min_pass: 5  # 要求所有运行都通过
+          - should_produce_file: test.txt
+        timeout: 30000
+
+  - name: flexible-response-check
+    runs: 10        # 场景覆盖：运行 10 次
+    min_pass: 8     # 场景覆盖：至少通过 8 次
+    environment: default
+    cleanup: true
+    steps:
+      - input: "输出 hello world"
+        expected:
+          - response_contains: "hello"
+        timeout: 15000
