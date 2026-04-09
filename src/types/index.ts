@@ -220,6 +220,10 @@ export interface ScenarioResult {
   steps: StepResult[];
   error?: string;
   tempDirectory?: string;
+  // 概率测试扩展字段
+  runs?: number;
+  min_pass?: number;
+  passed_runs?: number;
 }
 
 // ========== Probabilistic Test Types ==========

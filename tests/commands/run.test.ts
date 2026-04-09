@@ -597,4 +597,172 @@ describe('run command', () => {
       }));
     });
   });
+
+  // Probabilistic test execution tests
+  describe('probabilistic test execution', () => {
+    it('should run scenario multiple times based on runs config', async () => {
+      const mockSuite: YamlTestSuite = {
+        name: 'test',
+        environments: {
+          default: { directory: './test', setup: [] }
+        },
+        scenarios: [{
+          name: 'multi-run-scenario',
+          environment: 'default',
+          cleanup: true,
+          steps: [{
+            input: 'Create file',
+            expected: [{ should_call_tool: 'Write' }],
+            timeout: 60000
+          }]
+        }],
+        config: {
+          runs: 3,
+          min_pass: 2,
+          agent_cli: { runner: 'opencode', command: 'opencode' }
+        }
+      };
+
+      vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
+      vi.mocked(prepareEnvironment).mockResolvedValue({ tempDirectory: '/tmp/test' });
+      mockRunner.run.mockReturnValue({
+        outputs: [{ type: 'tool_call', data: { tool_name: 'Write' }, session_id: 'ses_1', timestamp: 1 }],
+        sessionId: 'ses_1'
+      });
+      vi.mocked(verifyAssertions).mockResolvedValue([
+        { type: 'should_call_tool', value: 'Write', passed: true, message: 'Tool called' }
+      ]);
+
+      const yamlPath = path.join(TEST_DIR, 'test.yaml');
+      await fs.writeFile(yamlPath, 'name: test');
+
+      const result = await runTests(yamlPath);
+
+      expect(result.scenarios[0].status).toBe('passed');
+      expect(result.scenarios[0].runs).toBe(3);
+    });
+
+    it('should use scenario-level runs/min_pass override', async () => {
+      const mockSuite: YamlTestSuite = {
+        name: 'test',
+        environments: {
+          default: { directory: './test', setup: [] }
+        },
+        scenarios: [{
+          name: 'override-scenario',
+          environment: 'default',
+          cleanup: true,
+          steps: [{
+            input: 'Test',
+            expected: [],
+            timeout: 60000
+          }],
+          runs: 2,
+          min_pass: 2
+        }],
+        config: {
+          runs: 10,
+          min_pass: 8,
+          agent_cli: { runner: 'opencode', command: 'opencode' }
+        }
+      };
+
+      vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
+      vi.mocked(prepareEnvironment).mockResolvedValue({ tempDirectory: '/tmp/test' });
+      mockRunner.run.mockReturnValue({
+        outputs: [],
+        sessionId: 'ses_1'
+      });
+      vi.mocked(verifyAssertions).mockResolvedValue([]);
+
+      const yamlPath = path.join(TEST_DIR, 'test.yaml');
+      await fs.writeFile(yamlPath, 'name: test');
+
+      const result = await runTests(yamlPath);
+
+      expect(result.scenarios[0].status).toBe('passed');
+      expect(result.scenarios[0].runs).toBe(2);
+      expect(result.scenarios[0].min_pass).toBe(2);
+    });
+
+    it('should support CLI --runs and --min-pass overrides', async () => {
+      const mockSuite: YamlTestSuite = {
+        name: 'test',
+        environments: {
+          default: { directory: './test', setup: [] }
+        },
+        scenarios: [{
+          name: 'cli-override',
+          environment: 'default',
+          cleanup: true,
+          steps: [{
+            input: 'Test',
+            expected: [],
+            timeout: 60000
+          }]
+        }],
+        config: {
+          runs: 10,
+          min_pass: 8,
+          agent_cli: { runner: 'opencode', command: 'opencode' }
+        }
+      };
+
+      vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
+      vi.mocked(prepareEnvironment).mockResolvedValue({ tempDirectory: '/tmp/test' });
+      mockRunner.run.mockReturnValue({
+        outputs: [],
+        sessionId: 'ses_1'
+      });
+      vi.mocked(verifyAssertions).mockResolvedValue([]);
+
+      const yamlPath = path.join(TEST_DIR, 'test.yaml');
+      await fs.writeFile(yamlPath, 'name: test');
+
+      const result = await runTests(yamlPath, { runs: 1, min_pass: 1 });
+
+      expect(result.scenarios[0].status).toBe('passed');
+      expect(result.scenarios[0].runs).toBe(1);
+    });
+
+    it('should support --quick mode for single run', async () => {
+      const mockSuite: YamlTestSuite = {
+        name: 'test',
+        environments: {
+          default: { directory: './test', setup: [] }
+        },
+        scenarios: [{
+          name: 'quick-test',
+          environment: 'default',
+          cleanup: true,
+          steps: [{
+            input: 'Test',
+            expected: [],
+            timeout: 60000
+          }]
+        }],
+        config: {
+          runs: 10,
+          min_pass: 8,
+          agent_cli: { runner: 'opencode', command: 'opencode' }
+        }
+      };
+
+      vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
+      vi.mocked(prepareEnvironment).mockResolvedValue({ tempDirectory: '/tmp/test' });
+      mockRunner.run.mockReturnValue({
+        outputs: [],
+        sessionId: 'ses_1'
+      });
+      vi.mocked(verifyAssertions).mockResolvedValue([]);
+
+      const yamlPath = path.join(TEST_DIR, 'test.yaml');
+      await fs.writeFile(yamlPath, 'name: test');
+
+      const result = await runTests(yamlPath, { quick: true });
+
+      expect(result.scenarios[0].status).toBe('passed');
+      expect(result.scenarios[0].runs).toBe(1);
+    });
+  });
 });
