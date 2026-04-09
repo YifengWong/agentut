@@ -3,7 +3,8 @@ import { generateTestResult, formatTimestamp } from '../../src/output/json.js';
 import type {
   ScenarioResult,
   StepResult,
-  YamlTestSuite
+  YamlTestSuite,
+  AssertionSummary
 } from '../../src/types/index.js';
 
 describe('formatTimestamp', () => {
@@ -175,5 +176,129 @@ describe('generateTestResult', () => {
     expect(result.scenarios[0].steps).toHaveLength(1);
     expect(result.scenarios[0].steps[0].input).toBe('Create file');
     expect(result.scenarios[0].steps[0].assertions).toHaveLength(1);
+  });
+});
+
+describe('probabilistic test result output', () => {
+  it('should include runs and min_pass in scenario result', () => {
+    const suite: YamlTestSuite = {
+      name: 'test',
+      environments: {},
+      scenarios: []
+    };
+
+    const steps: StepResult[] = [{
+      input: 'Create file',
+      status: 'passed',
+      duration_ms: 4100,
+      assertions: [],
+      runs: [
+        { run_index: 1, status: 'passed', duration_ms: 1000, assertions: [] },
+        { run_index: 2, status: 'passed', duration_ms: 1100, assertions: [] },
+        { run_index: 3, status: 'failed', duration_ms: 2000, assertions: [] }
+      ],
+      summary: {
+        total_runs: 3,
+        passed_runs: 2,
+        min_pass: 2,
+        status: 'passed'
+      }
+    }];
+
+    const scenarioResults: ScenarioResult[] = [
+      {
+        name: 'scenario',
+        environment: 'default',
+        status: 'passed',
+        duration_ms: 4100,
+        steps,
+        runs: 3,
+        min_pass: 2,
+        passed_runs: 2
+      }
+    ];
+
+    const result = generateTestResult(suite, scenarioResults, './test.yaml');
+
+    expect(result.scenarios[0].runs).toBe(3);
+    expect(result.scenarios[0].min_pass).toBe(2);
+    expect(result.scenarios[0].passed_runs).toBe(2);
+    expect(result.scenarios[0].steps[0].runs).toHaveLength(3);
+    expect(result.scenarios[0].steps[0].summary?.status).toBe('passed');
+  });
+
+  it('should include assertion summaries with pass rates', () => {
+    const suite: YamlTestSuite = {
+      name: 'test',
+      environments: {},
+      scenarios: []
+    };
+
+    const assertionSummaries: AssertionSummary[] = [
+      {
+        type: 'should_call_tool',
+        value: 'Write',
+        min_pass: 2,
+        passed_runs: 1,
+        status: 'failed',
+        failures: [
+          { run_index: 2, message: 'Not called' }
+        ]
+      }
+    ];
+
+    const steps: StepResult[] = [{
+      input: 'Create file',
+      status: 'failed',
+      duration_ms: 3000,
+      assertions: [],
+      runs: [
+        {
+          run_index: 1,
+          status: 'passed',
+          duration_ms: 1000,
+          assertions: [
+            { type: 'should_call_tool', value: 'Write', passed: true, message: 'OK' }
+          ]
+        },
+        {
+          run_index: 2,
+          status: 'failed',
+          duration_ms: 2000,
+          assertions: [
+            { type: 'should_call_tool', value: 'Write', passed: false, message: 'Not called' }
+          ]
+        }
+      ],
+      summary: {
+        total_runs: 2,
+        passed_runs: 1,
+        min_pass: 2,
+        status: 'failed'
+      },
+      assertionSummaries
+    }];
+
+    const scenarioResults: ScenarioResult[] = [
+      {
+        name: 'scenario',
+        environment: 'default',
+        status: 'failed',
+        duration_ms: 3000,
+        steps,
+        runs: 2,
+        min_pass: 2,
+        passed_runs: 1
+      }
+    ];
+
+    const result = generateTestResult(suite, scenarioResults, './test.yaml');
+
+    const assertionSummary = result.scenarios[0].steps[0].assertionSummaries?.[0];
+    expect(assertionSummary?.type).toBe('should_call_tool');
+    expect(assertionSummary?.passed_runs).toBe(1);
+    expect(assertionSummary?.min_pass).toBe(2);
+    expect(assertionSummary?.status).toBe('failed');
+    expect(assertionSummary?.failures).toHaveLength(1);
   });
 });

@@ -278,6 +278,7 @@ export interface StepResult {
   // 概率测试扩展字段
   runs?: RunExecution[];
   summary?: StepSummary;
+  assertionSummaries?: AssertionSummary[];
 }
 
 export interface AssertionResult {

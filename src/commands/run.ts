@@ -366,6 +366,7 @@ async function executeScenario(
         error: r.error
       }));
       stepResults[0].summary = stepSummary;
+      stepResults[0].assertionSummaries = assertionSummaries;
     }
   }
 
