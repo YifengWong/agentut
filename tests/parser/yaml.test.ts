@@ -370,3 +370,170 @@ scenarios: []
     expect(() => parseAndValidateYaml(yaml)).toThrow(ValidationError);
   });
 });
+
+describe('runs and min_pass configuration', () => {
+  it('should parse global runs and min_pass', () => {
+    const yaml = `
+name: test-suite
+environments:
+  default:
+    directory: ./test
+    setup: []
+scenarios:
+  - name: scenario-1
+    environment: default
+    cleanup: true
+    steps: []
+config:
+  runs: 10
+  min_pass: 8
+`;
+    const result = parseYaml(yaml);
+    expect(result.config?.runs).toBe(10);
+    expect(result.config?.min_pass).toBe(8);
+  });
+
+  it('should parse scenario-level runs and min_pass', () => {
+    const yaml = `
+name: test-suite
+environments:
+  default:
+    directory: ./test
+    setup: []
+scenarios:
+  - name: scenario-1
+    environment: default
+    cleanup: true
+    steps: []
+    runs: 5
+    min_pass: 4
+`;
+    const result = parseYaml(yaml);
+    expect(result.scenarios[0].runs).toBe(5);
+    expect(result.scenarios[0].min_pass).toBe(4);
+  });
+
+  it('should parse assertion-level min_pass', () => {
+    const yaml = `
+name: test-suite
+environments:
+  default:
+    directory: ./test
+    setup: []
+scenarios:
+  - name: scenario-1
+    environment: default
+    cleanup: true
+    steps:
+      - input: "test"
+        expected:
+          - should_call_tool: Write
+            min_pass: 9
+`;
+    const result = parseYaml(yaml);
+    const assertion = result.scenarios[0].steps[0].expected[0];
+    expect(assertion).toHaveProperty('min_pass', 9);
+  });
+});
+
+describe('validateYamlTestSuite runs and min_pass defaults', () => {
+  it('should set default runs=5 and min_pass=4 when not provided', () => {
+    const suite: YamlTestSuite = {
+      name: 'test',
+      environments: {
+        default: { directory: './test', setup: [] }
+      },
+      scenarios: [{
+        name: 'scenario-1',
+        environment: 'default',
+        cleanup: true,
+        steps: [{
+          input: 'test',
+          expected: []
+        }]
+      }]
+    };
+    validateYamlTestSuite(suite);
+    expect(suite.config?.runs).toBe(5);
+    expect(suite.config?.min_pass).toBe(4);
+  });
+
+  it('should preserve user-configured runs and min_pass', () => {
+    const suite: YamlTestSuite = {
+      name: 'test',
+      environments: {
+        default: { directory: './test', setup: [] }
+      },
+      scenarios: [{
+        name: 'scenario-1',
+        environment: 'default',
+        cleanup: true,
+        steps: []
+      }],
+      config: {
+        runs: 10,
+        min_pass: 8
+      }
+    };
+    validateYamlTestSuite(suite);
+    expect(suite.config?.runs).toBe(10);
+    expect(suite.config?.min_pass).toBe(8);
+  });
+
+  it('should validate min_pass <= runs', () => {
+    const suite: YamlTestSuite = {
+      name: 'test',
+      environments: {
+        default: { directory: './test', setup: [] }
+      },
+      scenarios: [{
+        name: 'scenario-1',
+        environment: 'default',
+        cleanup: true,
+        steps: []
+      }],
+      config: {
+        runs: 3,
+        min_pass: 5  // 无效：min_pass > runs
+      }
+    };
+    expect(() => validateYamlTestSuite(suite)).toThrow(ValidationError);
+  });
+
+  it('should validate scenario-level min_pass <= runs', () => {
+    const suite: YamlTestSuite = {
+      name: 'test',
+      environments: {
+        default: { directory: './test', setup: [] }
+      },
+      scenarios: [{
+        name: 'scenario-1',
+        environment: 'default',
+        cleanup: true,
+        steps: [],
+        runs: 3,
+        min_pass: 5  // 无效
+      }]
+    };
+    expect(() => validateYamlTestSuite(suite)).toThrow(ValidationError);
+  });
+
+  it('should validate runs is positive', () => {
+    const suite: YamlTestSuite = {
+      name: 'test',
+      environments: {
+        default: { directory: './test', setup: [] }
+      },
+      scenarios: [{
+        name: 'scenario-1',
+        environment: 'default',
+        cleanup: true,
+        steps: []
+      }],
+      config: {
+        runs: 0  // 无效
+      }
+    };
+    expect(() => validateYamlTestSuite(suite)).toThrow(ValidationError);
+  });
+});

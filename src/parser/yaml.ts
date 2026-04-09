@@ -63,13 +63,65 @@ export function validateYamlTestSuite(suite: YamlTestSuite): void {
     throw new ValidationError('Missing required field: scenarios', 'scenarios');
   }
 
-  // Validate each scenario references a valid environment
+  // Set default runs and min_pass if not provided
+  if (suite.config?.runs === undefined) {
+    suite.config = suite.config || {};
+    suite.config.runs = 5;
+  }
+  if (suite.config?.min_pass === undefined) {
+    suite.config = suite.config || {};
+    suite.config.min_pass = 4;
+  }
+
+  // Validate runs and min_pass at global level
+  if (suite.config.runs <= 0) {
+    throw new ValidationError('runs must be a positive integer', 'config.runs');
+  }
+  if (suite.config.min_pass <= 0) {
+    throw new ValidationError('min_pass must be a positive integer', 'config.min_pass');
+  }
+  if (suite.config.min_pass > suite.config.runs) {
+    throw new ValidationError(
+      `min_pass (${suite.config.min_pass}) cannot be greater than runs (${suite.config.runs})`,
+      'config.min_pass'
+    );
+  }
+
+  // Validate and set defaults for scenario-level runs and min_pass
   for (const scenario of suite.scenarios) {
+    // Validate scenario references a valid environment
     if (!scenario.environment || !(scenario.environment in suite.environments)) {
       throw new ValidationError(
         `Scenario "${scenario.name}" references non-existent environment: ${scenario.environment}`,
         'scenarios.environment'
       );
+    }
+
+    // If scenario specifies runs, validate it
+    if (scenario.runs !== undefined) {
+      if (scenario.runs <= 0) {
+        throw new ValidationError(
+          `Scenario "${scenario.name}": runs must be a positive integer`,
+          `scenarios.${scenario.name}.runs`
+        );
+      }
+    }
+
+    // If scenario specifies min_pass, validate it
+    if (scenario.min_pass !== undefined) {
+      const effectiveRuns = scenario.runs ?? suite.config!.runs!;
+      if (scenario.min_pass <= 0) {
+        throw new ValidationError(
+          `Scenario "${scenario.name}": min_pass must be a positive integer`,
+          `scenarios.${scenario.name}.min_pass`
+        );
+      }
+      if (scenario.min_pass > effectiveRuns) {
+        throw new ValidationError(
+          `Scenario "${scenario.name}": min_pass (${scenario.min_pass}) cannot be greater than runs (${effectiveRuns})`,
+          `scenarios.${scenario.name}.min_pass`
+        );
+      }
     }
 
     // Validate assertions in steps
