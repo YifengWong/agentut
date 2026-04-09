@@ -24,6 +24,8 @@ export interface ScenarioConfig {
   environment: string;
   cleanup: boolean;
   steps: StepConfig[];
+  runs?: number;      // 概率测试：覆盖全局设置
+  min_pass?: number;  // 概率测试：覆盖全局设置
 }
 
 export interface StepConfig {
@@ -55,6 +57,7 @@ export interface ToolCallAssertion {
   name: string | Matcher;
   input?: Record<string, string | Matcher>;
   status?: 'completed' | 'error' | 'pending';
+  min_pass?: number;  // 概率测试：覆盖场景/全局设置
 }
 
 /**
@@ -63,6 +66,7 @@ export interface ToolCallAssertion {
 export interface FileContentAssertion {
   file: string | Matcher;
   text: string | Matcher;
+  min_pass?: number;  // 概率测试：覆盖场景/全局设置
 }
 
 export type Assertion =
@@ -85,6 +89,8 @@ export interface GlobalConfig {
   default_timeout?: number;
   parallel?: boolean;
   agent_cli?: AgentCliConfig;  // 新增：Agent CLI 配置
+  runs?: number;                // 概率测试：运行次数
+  min_pass?: number;            // 概率测试：最小通过次数
   /** @deprecated Use environment.agent and setup.copy with $WORKDIR instead */
   target?: {
     skill?: string;
@@ -216,12 +222,58 @@ export interface ScenarioResult {
   tempDirectory?: string;
 }
 
+// ========== Probabilistic Test Types ==========
+
+/**
+ * 单次运行的断言失败详情
+ */
+export interface AssertionFailure {
+  run_index: number;
+  message: string;
+}
+
+/**
+ * 单次运行的执行结果
+ */
+export interface RunExecution {
+  run_index: number;
+  status: 'passed' | 'failed';
+  duration_ms: number;
+  assertions: AssertionResult[];
+  error?: string;
+}
+
+/**
+ * 步骤级别的汇总统计
+ */
+export interface StepSummary {
+  total_runs: number;
+  passed_runs: number;
+  min_pass: number;
+  status: 'passed' | 'failed';
+}
+
+/**
+ * 断言级别的汇总统计
+ */
+export interface AssertionSummary {
+  type: string;
+  value: string | Matcher | ToolCallAssertion | FileContentAssertion | { file: string; text: string };
+  min_pass: number;
+  passed_runs: number;
+  status: 'passed' | 'failed';
+  failures: AssertionFailure[];
+}
+
 export interface StepResult {
   input: string;
   status: 'passed' | 'failed';
   duration_ms: number;
   assertions: AssertionResult[];
   actual_output?: OpenCodeRunOutput[];
+  // 概率测试扩展字段
+  runs?: RunExecution[];
+  summary?: StepSummary;
 }
 
 export interface AssertionResult {

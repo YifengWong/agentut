@@ -6,7 +6,15 @@ import {
   SetupError,
   type Assertion,
   type AgentCliConfig,
-  type SessionInfo
+  type SessionInfo,
+  type GlobalConfig,
+  type ScenarioConfig,
+  type ToolCallAssertion,
+  type FileContentAssertion,
+  type StepResult,
+  type RunExecution,
+  type AssertionSummary,
+  type AssertionFailure
 } from '../../src/types/index.js';
 
 describe('Error Classes', () => {
@@ -132,5 +140,118 @@ describe('SessionInfo type', () => {
     };
     expect(info.title).toBe('Test Session');
     expect(info.created).toBe(1234567890);
+  });
+});
+
+describe('Probabilistic test types', () => {
+  describe('GlobalConfig runs and min_pass', () => {
+    it('should accept runs and min_pass as optional fields', () => {
+      const config: GlobalConfig = {
+        runs: 10,
+        min_pass: 8,
+        default_timeout: 120000
+      };
+      expect(config.runs).toBe(10);
+      expect(config.min_pass).toBe(8);
+    });
+
+    it('should allow missing runs and min_pass', () => {
+      const config: GlobalConfig = {
+        default_timeout: 60000
+      };
+      expect(config.runs).toBeUndefined();
+      expect(config.min_pass).toBeUndefined();
+    });
+  });
+
+  describe('ScenarioConfig runs and min_pass override', () => {
+    it('should allow scenario-level runs and min_pass', () => {
+      const scenario: ScenarioConfig = {
+        name: 'test',
+        environment: 'default',
+        cleanup: true,
+        steps: [],
+        runs: 5,
+        min_pass: 4
+      };
+      expect(scenario.runs).toBe(5);
+      expect(scenario.min_pass).toBe(4);
+    });
+  });
+
+  describe('Assertion min_pass override', () => {
+    it('should allow min_pass in ToolCallAssertion', () => {
+      const assertion: ToolCallAssertion = {
+        name: 'Write',
+        min_pass: 9
+      };
+      expect(assertion.min_pass).toBe(9);
+    });
+  });
+
+  describe('RunExecution type', () => {
+    it('should track single run execution result', () => {
+      const run: RunExecution = {
+        run_index: 1,
+        status: 'passed',
+        duration_ms: 5000,
+        assertions: [
+          { type: 'should_call_tool', value: 'Write', passed: true, message: 'OK' }
+        ]
+      };
+      expect(run.run_index).toBe(1);
+      expect(run.status).toBe('passed');
+    });
+
+    it('should include error info for failed run', () => {
+      const run: RunExecution = {
+        run_index: 2,
+        status: 'failed',
+        duration_ms: 60000,
+        assertions: [],
+        error: 'Timeout'
+      };
+      expect(run.error).toBe('Timeout');
+    });
+  });
+
+  describe('AssertionSummary type', () => {
+    it('should summarize assertion pass rate', () => {
+      const summary: AssertionSummary = {
+        type: 'should_call_tool',
+        value: 'Write',
+        min_pass: 9,
+        passed_runs: 8,
+        status: 'failed',
+        failures: [
+          { run_index: 3, message: 'Tool not called' }
+        ]
+      };
+      expect(summary.passed_runs).toBe(8);
+      expect(summary.status).toBe('failed');
+      expect(summary.failures).toHaveLength(1);
+    });
+  });
+
+  describe('StepResult extended structure', () => {
+    it('should support runs array structure', () => {
+      const step: StepResult = {
+        input: 'Create file',
+        status: 'passed',
+        runs: [
+          { run_index: 1, status: 'passed', duration_ms: 1000, assertions: [] }
+        ],
+        summary: {
+          total_runs: 1,
+          passed_runs: 1,
+          min_pass: 1,
+          status: 'passed'
+        },
+        assertions: [],
+        duration_ms: 1000
+      };
+      expect(step.runs).toHaveLength(1);
+      expect(step.summary?.status).toBe('passed');
+    });
   });
 });
