@@ -76,6 +76,10 @@ program
   .option('-m, --model <model>', 'Override model (provider/model)')
   .option('-a, --agent <agent>', 'Override agent')
   .option('--verbose', 'Show detailed output')
+  // 概率测试选项
+  .option('--runs <n>', 'Override runs configuration', parseInt)
+  .option('--min-pass <n>', 'Override min_pass configuration', parseInt)
+  .option('--quick', 'Quick mode: single run (runs=1, min_pass=1)')
   .action(async (testFile, options) => {
     try {
       const result = await runTests(testFile, {
@@ -85,7 +89,10 @@ program
         parallel: options.parallel,
         model: options.model,
         agent: options.agent,
-        verbose: options.verbose
+        verbose: options.verbose,
+        runs: options.runs,
+        min_pass: options.minPass,
+        quick: options.quick
       });
 
       // Format output

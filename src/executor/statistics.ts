@@ -3,7 +3,10 @@ import type {
   AssertionSummary,
   AssertionFailure,
   Assertion,
-  AssertionResult
+  AssertionResult,
+  Matcher,
+  ToolCallAssertion,
+  FileContentAssertion
 } from '../types/index.js';
 
 /**
@@ -50,21 +53,45 @@ function getAssertionType(assertion: Assertion): string {
 /**
  * 从 Assertion 提取值
  */
-function getAssertionValue(assertion: Assertion): string | undefined {
-  if ('should_call_tool' in assertion) return assertion.should_call_tool as string;
-  if ('should_produce_file' in assertion) return assertion.should_produce_file as string;
-  if ('file_content_contains' in assertion) return assertion.file_content_contains as { file: string; text: string };
-  if ('response_contains' in assertion) return assertion.response_contains as string;
+function getAssertionValue(assertion: Assertion): string | Matcher | ToolCallAssertion | FileContentAssertion | { file: string; text: string } | undefined {
+  if ('should_call_tool' in assertion) return assertion.should_call_tool as string | ToolCallAssertion;
+  if ('should_produce_file' in assertion) return assertion.should_produce_file as string | Matcher;
+  if ('file_content_contains' in assertion) return assertion.file_content_contains as FileContentAssertion | { file: string; text: string };
+  if ('response_contains' in assertion) return assertion.response_contains as string | Matcher;
   return undefined;
 }
 
 /**
  * 从 Assertion 提取 min_pass
+ * 支持两种格式：
+ * 1. min_pass 在 ToolCallAssertion/FileContentAssertion 内部（符合类型定义）
+ * 2. min_pass 直接在 Assertion 顶层（实际对象可能包含额外属性）
  */
 function getAssertionMinPass(assertion: Assertion, defaultMinPass: number): number {
-  if ('min_pass' in assertion && assertion.min_pass !== undefined) {
-    return assertion.min_pass;
+  // 首先检查顶层 min_pass（支持实际对象包含额外属性的情况）
+  if ('min_pass' in assertion) {
+    const minPassValue = (assertion as Record<string, unknown>).min_pass;
+    if (typeof minPassValue === 'number' && minPassValue !== null) {
+      return minPassValue;
+    }
   }
+
+  // 检查 ToolCallAssertion 内部的 min_pass
+  if ('should_call_tool' in assertion && typeof assertion.should_call_tool === 'object' && assertion.should_call_tool !== null) {
+    const toolCall = assertion.should_call_tool as ToolCallAssertion;
+    if (toolCall.min_pass !== undefined && toolCall.min_pass !== null) {
+      return toolCall.min_pass;
+    }
+  }
+
+  // 检查 FileContentAssertion 内部的 min_pass
+  if ('file_content_contains' in assertion && typeof assertion.file_content_contains === 'object' && assertion.file_content_contains !== null) {
+    const fileContent = assertion.file_content_contains as FileContentAssertion;
+    if (fileContent.min_pass !== undefined && fileContent.min_pass !== null) {
+      return fileContent.min_pass;
+    }
+  }
+
   return defaultMinPass;
 }
 
@@ -108,14 +135,17 @@ export function calculateAssertionSummaries(
 
     const status = passedRuns >= minPass ? 'passed' : 'failed';
 
-    summaries.push({
-      type,
-      value,
-      min_pass: minPass,
-      passed_runs: passedRuns,
-      status,
-      failures
-    });
+    // value 应该总是存在，因为每个 assertion 至少有一个断言属性
+    if (value !== undefined) {
+      summaries.push({
+        type,
+        value,
+        min_pass: minPass,
+        passed_runs: passedRuns,
+        status,
+        failures
+      });
+    }
   }
 
   return summaries;

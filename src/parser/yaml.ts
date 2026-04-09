@@ -73,16 +73,20 @@ export function validateYamlTestSuite(suite: YamlTestSuite): void {
     suite.config.min_pass = 4;
   }
 
+  // At this point, runs and min_pass are guaranteed to be set
+  const configRuns = suite.config.runs!;
+  const configMinPass = suite.config.min_pass!;
+
   // Validate runs and min_pass at global level
-  if (suite.config.runs <= 0) {
+  if (configRuns <= 0) {
     throw new ValidationError('runs must be a positive integer', 'config.runs');
   }
-  if (suite.config.min_pass <= 0) {
+  if (configMinPass <= 0) {
     throw new ValidationError('min_pass must be a positive integer', 'config.min_pass');
   }
-  if (suite.config.min_pass > suite.config.runs) {
+  if (configMinPass > configRuns) {
     throw new ValidationError(
-      `min_pass (${suite.config.min_pass}) cannot be greater than runs (${suite.config.runs})`,
+      `min_pass (${configMinPass}) cannot be greater than runs (${configRuns})`,
       'config.min_pass'
     );
   }
