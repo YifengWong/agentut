@@ -245,6 +245,7 @@ export interface RunExecution {
   duration_ms: number;
   assertions: AssertionResult[];
   error?: string;
+  output?: OpenCodeRunOutput[];  // 每次运行的详细输出
 }
 
 /**

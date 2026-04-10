@@ -14,7 +14,8 @@ import {
   type StepResult,
   type RunExecution,
   type AssertionSummary,
-  type AssertionFailure
+  type AssertionFailure,
+  type OpenCodeRunOutput
 } from '../../src/types/index.js';
 
 describe('Error Classes', () => {
@@ -212,6 +213,35 @@ describe('Probabilistic test types', () => {
         error: 'Timeout'
       };
       expect(run.error).toBe('Timeout');
+    });
+
+    it('should support optional output field for session output', () => {
+      const output: OpenCodeRunOutput[] = [
+        { type: 'text', part: { text: 'Response text' } },
+        { type: 'tool_use', part: { tool: 'Write', state: { status: 'completed' } } }
+      ];
+
+      const runExecution: RunExecution = {
+        run_index: 0,
+        status: 'passed',
+        duration_ms: 1000,
+        assertions: [],
+        output
+      };
+
+      expect(runExecution.output).toBeDefined();
+      expect(runExecution.output).toHaveLength(2);
+    });
+
+    it('should allow output field to be undefined', () => {
+      const runExecution: RunExecution = {
+        run_index: 0,
+        status: 'passed',
+        duration_ms: 1000,
+        assertions: []
+      };
+
+      expect(runExecution.output).toBeUndefined();
     });
   });
 
