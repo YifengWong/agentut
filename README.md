@@ -281,6 +281,29 @@ agentvcr run ./tests/my-test.yaml --runs 3 --min-pass 2
 1. 场景整体通过次数 >= min_pass
 2. 每个断言的通过次数 >= 断言各自的 min_pass
 
+### 多次运行结果展示
+
+概率测试的多次运行结果会在报告中展示：
+
+**HTML 报告**：
+- 运行统计摘要
+- 断言统计表格（各断言通过率）
+- 可折叠的每次运行详情（状态、耗时、断言、会话输出）
+
+**Markdown 报告**：
+- 运行统计摘要
+- 运行详情表格
+
+| 运行 | 状态 | 耗时 | 断言 |
+|-----|------|------|------|
+| 1 | ✓ passed | 5200ms | 2/2 |
+| 2 | ✓ passed | 5100ms | 2/2 |
+| 3 | ✗ failed | 60000ms | 0/2 (超时) |
+
+**Jest 格式**：
+- 断言级别测试结果
+- 失败断言的 `failureMessages` 包含通过率和失败原因
+
 ## Agent CLI 配置
 
 Agent VCR 支持配置自定义 CLI 命令名，适用于企业环境封装场景。在 YAML 测试文件的 `config.agent_cli` 中配置：
@@ -361,7 +384,7 @@ agentvcr suggest <testFile> [-s sessionId] [--latest] [-o file] [--skill name] [
 运行测试用例。
 
 ```bash
-agentvcr run <testFile> [-f format] [-o file] [-s scenario] [--verbose]
+agentvcr run <testFile> [-f format] [-o file] [-s scenario]
 ```
 
 **选项**：
@@ -371,7 +394,9 @@ agentvcr run <testFile> [-f format] [-o file] [-s scenario] [--verbose]
 - `--parallel` - 并行运行场景
 - `-m, --model <model>` - 覆盖模型配置
 - `-a, --agent <agent>` - 覆盖 agent 配置
-- `--verbose` - 显示详细输出
+- `--runs <n>` - 覆盖全局 runs 配置
+- `--min-pass <n>` - 覆盖全局 min_pass 配置
+- `--quick` - 快速模式: runs=1, min_pass=1
 
 ### agentvcr report
 
@@ -420,26 +445,40 @@ Summary: 2 passed, 0 failed (total 21s)
 
 ## 输出格式
 
-- `json` - 结构化 JSON（默认）
-- `markdown` - 人类可读的 Markdown
-- `html` - 带样式的 HTML 报告
-- `jest` - Jest 兼容格式，便于 CI 集成
+Agent VCR 支持四种输出格式：
 
-### 会话内容展示
+| 格式 | 说明 | 详尽程度 |
+|-----|------|---------|
+| `json` | 结构化 JSON（默认） | 详尽（含 actual_output） |
+| `html` | 带样式的 HTML 报告 | 详尽（含 actual_output、多运行详情） |
+| `markdown` | 人类可读的 Markdown | 简洁（含多运行统计表格） |
+| `jest` | Jest 兼容格式 | 简洁（断言级别结果） |
 
-使用 `--verbose` 参数时，markdown 和 html 格式的测试报告会包含完整的会话内容：
+### JSON 输出
 
-- **Request**: 用户的输入请求
-- **Response**: Agent 的文本响应
-- **Tool Calls**: 工具调用列表（工具名、状态、输入参数）
-- **Raw Output**: 原始 JSON 输出（折叠显示）
+JSON 格式输出完整的测试数据，包含所有字段。适用于程序化处理和报告重新生成。
 
-示例：
+### HTML 输出
 
-```bash
-agentvcr run ./tests/ --verbose -f markdown -o report.md
-agentvcr run ./tests/ --verbose -f html -o report.html
-```
+HTML 格式生成美观的网页报告，特性包括：
+- 响应式布局
+- 多次运行详情展示（概率测试）
+- 可折叠的运行详情和会话输出
+- 断言统计表格
+
+### Markdown 输出
+
+Markdown 格式适合人类阅读和版本控制：
+- 简洁的运行统计表格
+- 断言结果列表
+- 不包含完整的会话输出（保持简洁）
+
+### Jest 格式
+
+Jest 格式便于 CI/CD 集成：
+- 断言级别的测试结果
+- 失败断言展示通过率和失败详情
+- 兼容现有 Jest 测试报告工具
 
 ## CI/CD 集成
 
