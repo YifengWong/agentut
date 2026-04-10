@@ -328,13 +328,13 @@ function formatAssertionSummariesHtml(assertionSummaries: AssertionSummary[]): s
         </tr>
         ${assertionSummaries.map(as => {
           const value = typeof as.value === 'string' ? as.value : `${JSON.stringify(as.value)}`;
-          const passRate = `${as.passed_runs}/${as.total_runs || assertionSummaries.length > 0 ? (assertionSummaries[0] as AssertionSummary).passed_runs : 0}`;
+          const totalRuns = as.passed_runs + as.failures.length;
           const statusClass = as.status === 'passed' ? 'assertion-summary-passed' : 'assertion-summary-failed';
           const statusIcon = as.status === 'passed' ? '✓' : '✗';
           return `<tr>
             <td>${escapeHtml(as.type)}</td>
             <td><code>${escapeHtml(value)}</code></td>
-            <td>${as.passed_runs}/${as.passed_runs + as.failures.length}</td>
+            <td>${as.passed_runs}/${totalRuns}</td>
             <td>≥ ${as.min_pass}</td>
             <td class="${statusClass}">${statusIcon} ${as.status.toUpperCase()}</td>
           </tr>`;
