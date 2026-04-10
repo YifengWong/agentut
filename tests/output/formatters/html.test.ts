@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { formatAsHtml, formatSessionOutputHtml } from '../../../src/output/formatters/html.js';
-import type { TestResult, OpenCodeRunOutput } from '../../../src/types/index.js';
+import { formatAsHtml, formatSessionOutputHtml, formatRunsDetailHtml } from '../../../src/output/formatters/html.js';
+import type { TestResult, OpenCodeRunOutput, RunExecution, StepSummary, AssertionSummary } from '../../../src/types/index.js';
 
 describe('formatAsHtml', () => {
   it('should generate complete HTML document', () => {
@@ -250,5 +250,134 @@ describe('formatSessionOutputHtml', () => {
     const result = formatSessionOutputHtml(mockSessionOutput, 'test');
     expect(result).toContain('<details class="session-raw">');
     expect(result).toContain('<summary>Raw Output</summary>');
+  });
+});
+
+describe('formatRunsDetailHtml', () => {
+  it('should display runs summary for probabilistic test', () => {
+    const runs: RunExecution[] = [
+      { run_index: 0, status: 'passed', duration_ms: 100, assertions: [] },
+      { run_index: 1, status: 'passed', duration_ms: 120, assertions: [] },
+      { run_index: 2, status: 'failed', duration_ms: 80, assertions: [], error: 'Timeout' }
+    ];
+    const summary: StepSummary = { total_runs: 3, passed_runs: 2, min_pass: 2, status: 'passed' };
+
+    const result = formatRunsDetailHtml(runs, summary);
+
+    expect(result).toContain('运行统计');
+    expect(result).toContain('3 次运行');
+    expect(result).toContain('2 次通过');
+    expect(result).toContain('要求 ≥ 2');
+    expect(result).toContain('运行详情');
+    expect(result).toContain('<details');
+    expect(result).toContain('运行 1');
+    expect(result).toContain('运行 2');
+    expect(result).toContain('运行 3');
+  });
+
+  it('should display each run with collapsible details', () => {
+    const runs: RunExecution[] = [
+      {
+        run_index: 0,
+        status: 'passed',
+        duration_ms: 100,
+        assertions: [],
+        output: [{ type: 'text', part: { text: 'Session output for run 1' } }]
+      },
+      {
+        run_index: 1,
+        status: 'passed',
+        duration_ms: 120,
+        assertions: [],
+        output: [{ type: 'text', part: { text: 'Session output for run 2' } }]
+      }
+    ];
+    const summary: StepSummary = { total_runs: 2, passed_runs: 2, min_pass: 1, status: 'passed' };
+
+    const result = formatRunsDetailHtml(runs, summary);
+
+    expect(result).toContain('<details class="run-item');
+    expect(result).toContain('<summary class="run-header">');
+    expect(result).toContain('Session output for run 1');
+    expect(result).toContain('Session output for run 2');
+  });
+
+  it('should display error message for failed runs', () => {
+    const runs: RunExecution[] = [
+      { run_index: 0, status: 'passed', duration_ms: 100, assertions: [] },
+      { run_index: 1, status: 'failed', duration_ms: 80, assertions: [], error: 'Connection timeout' }
+    ];
+    const summary: StepSummary = { total_runs: 2, passed_runs: 1, min_pass: 2, status: 'failed' };
+
+    const result = formatRunsDetailHtml(runs, summary);
+
+    expect(result).toContain('run-item failed');
+    expect(result).toContain('Connection timeout');
+  });
+
+  it('should not display runs section for single-run scenario', () => {
+    const runs: RunExecution[] = [
+      { run_index: 0, status: 'passed', duration_ms: 100, assertions: [] }
+    ];
+    const summary: StepSummary = { total_runs: 1, passed_runs: 1, min_pass: 1, status: 'passed' };
+
+    const result = formatRunsDetailHtml(runs, summary);
+
+    expect(result).not.toContain('运行统计');
+    expect(result).not.toContain('运行详情');
+    expect(result).toBe('');
+  });
+
+  it('should return empty string for empty runs', () => {
+    const runs: RunExecution[] = [];
+    const summary: StepSummary = { total_runs: 0, passed_runs: 0, min_pass: 0, status: 'passed' };
+
+    const result = formatRunsDetailHtml(runs, summary);
+
+    expect(result).toBe('');
+  });
+
+  it('should display assertion summaries in runs summary', () => {
+    const runs: RunExecution[] = [
+      { run_index: 0, status: 'passed', duration_ms: 100, assertions: [
+        { type: 'should_call_tool', value: 'Write', passed: true }
+      ] },
+      { run_index: 1, status: 'passed', duration_ms: 120, assertions: [
+        { type: 'should_call_tool', value: 'Write', passed: true }
+      ] }
+    ];
+    const summary: StepSummary = { total_runs: 2, passed_runs: 2, min_pass: 1, status: 'passed' };
+    const assertionSummaries: AssertionSummary[] = [
+      { type: 'should_call_tool', value: 'Write', min_pass: 1, passed_runs: 2, status: 'passed', failures: [] }
+    ];
+
+    const result = formatRunsDetailHtml(runs, summary, assertionSummaries);
+
+    expect(result).toContain('断言统计');
+    expect(result).toContain('should_call_tool');
+    expect(result).toContain('Write');
+    expect(result).toContain('2/2');
+  });
+
+  it('should display assertion with partial pass rate', () => {
+    const runs: RunExecution[] = [
+      { run_index: 0, status: 'passed', duration_ms: 100, assertions: [
+        { type: 'response_contains', value: 'success', passed: true }
+      ] },
+      { run_index: 1, status: 'failed', duration_ms: 80, assertions: [
+        { type: 'response_contains', value: 'success', passed: false }
+      ] }
+    ];
+    const summary: StepSummary = { total_runs: 2, passed_runs: 1, min_pass: 2, status: 'failed' };
+    const assertionSummaries: AssertionSummary[] = [
+      { type: 'response_contains', value: 'success', min_pass: 2, passed_runs: 1, status: 'failed', failures: [
+        { run_index: 1, message: 'Expected "success" not found' }
+      ] }
+    ];
+
+    const result = formatRunsDetailHtml(runs, summary, assertionSummaries);
+
+    expect(result).toContain('1/2');
+    expect(result).toContain('assertion-summary-failed');
   });
 });

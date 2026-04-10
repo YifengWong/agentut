@@ -1,4 +1,4 @@
-import type { TestResult, ScenarioResult, StepResult, OpenCodeRunOutput } from '../../types/index.js';
+import type { TestResult, ScenarioResult, StepResult, OpenCodeRunOutput, RunExecution, StepSummary, AssertionSummary } from '../../types/index.js';
 
 export function formatAsHtml(result: TestResult): string {
   return `<!DOCTYPE html>
@@ -62,6 +62,26 @@ export function formatAsHtml(result: TestResult): string {
 .session-tool-calls td code { background: #f4f4f4; padding: 2px 4px; border-radius: 3px; }
 .session-raw { margin-top: 10px; }
 .session-raw pre { background: #fff; padding: 10px; border-radius: 4px; overflow-x: auto; }
+.runs-summary { background: #f0f8ff; padding: 15px; border-radius: 4px; margin: 10px 0; border-left: 4px solid #3498db; }
+.runs-summary h4 { margin-bottom: 10px; color: #2c3e50; }
+.runs-summary-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.runs-summary-stat { margin: 5px 0; }
+.assertion-summary-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+.assertion-summary-table th, .assertion-summary-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+.assertion-summary-table th { background: #f4f4f4; }
+.assertion-summary-passed { color: #27ae60; }
+.assertion-summary-failed { color: #e74c3c; }
+.run-item { margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; }
+.run-item.passed { border-left: 4px solid #27ae60; }
+.run-item.failed { border-left: 4px solid #e74c3c; }
+.run-header { padding: 10px 15px; background: #f9f9f9; cursor: pointer; font-weight: bold; list-style: none; }
+.run-header::-webkit-details-marker { display: none; }
+.run-header::before { content: '▶ '; }
+details[open] > .run-header::before { content: '▼ '; }
+.run-content { padding: 15px; border-top: 1px solid #ddd; }
+.run-error { background: #fff3cd; padding: 10px; border-radius: 4px; margin: 10px 0; }
+.run-details-section { margin-top: 20px; }
+.run-details-section h4 { margin-bottom: 10px; color: #2c3e50; }
   </style>
 </head>
 <body>
@@ -111,7 +131,8 @@ function formatStep(step: StepResult, index: number): string {
     <div class="step">
       <div class="step-header">${index}. Input: "${escapeHtml(step.input)}"</div>
       <div class="meta">Status: ${step.status} | Duration: ${step.duration_ms}ms</div>
-      ${step.actual_output ? formatSessionOutputHtml(step.actual_output, step.input) : ''}
+      ${step.runs && step.runs.length > 1 && step.summary ? formatRunsDetailHtml(step.runs, step.summary, step.assertionSummaries) : ''}
+      ${!step.runs || step.runs.length <= 1 ? (step.actual_output ? formatSessionOutputHtml(step.actual_output, step.input) : '') : ''}
       ${step.assertions.length > 0 ? `
         <div class="assertions">
           ${step.assertions.map(a => {
@@ -214,5 +235,110 @@ export function formatSessionOutputHtml(
       ${responseHtml}
       ${toolCallsHtml}
       ${rawOutputHtml}
+    </div>`;
+}
+
+/**
+ * 格式化多运行详情的 HTML
+ * 用于概率测试场景，显示每次运行的详细信息和断言统计
+ */
+export function formatRunsDetailHtml(
+  runs: RunExecution[],
+  summary: StepSummary,
+  assertionSummaries?: AssertionSummary[]
+): string {
+  // 单次运行或空运行不显示详情
+  if (!runs || runs.length <= 1) {
+    return '';
+  }
+
+  // 运行统计部分
+  const statsHtml = `
+    <div class="runs-summary">
+      <h4>运行统计</h4>
+      <div class="runs-summary-stats">
+        <div class="runs-summary-stat"><strong>总运行:</strong> ${summary.total_runs} 次运行</div>
+        <div class="runs-summary-stat"><strong>通过:</strong> <span class="${summary.passed_runs >= summary.min_pass ? 'status-passed' : 'status-failed'}">${summary.passed_runs} 次通过</span></div>
+        <div class="runs-summary-stat">要求 ≥ ${summary.min_pass}</div>
+        <div class="runs-summary-stat"><strong>状态:</strong> <span class="${summary.status === 'passed' ? 'status-passed' : 'status-failed'}">${summary.status.toUpperCase()}</span></div>
+      </div>
+      ${assertionSummaries && assertionSummaries.length > 0 ? formatAssertionSummariesHtml(assertionSummaries) : ''}
+    </div>`;
+
+  // 每次运行的详情部分
+  const runsDetailsHtml = runs.map(run => {
+    const statusClass = run.status === 'passed' ? 'passed' : 'failed';
+    const statusIcon = run.status === 'passed' ? '✓' : '✗';
+
+    const errorHtml = run.error ? `
+      <div class="run-error">
+        <strong>错误:</strong> ${escapeHtml(run.error)}
+      </div>` : '';
+
+    const outputHtml = run.output && run.output.length > 0
+      ? formatSessionOutputHtml(run.output, `运行 ${run.run_index + 1}`)
+      : '';
+
+    const assertionsHtml = run.assertions && run.assertions.length > 0 ? `
+      <div class="assertions">
+        ${run.assertions.map(a => {
+          const value = typeof a.value === 'string' ? a.value : `${JSON.stringify(a.value)}`;
+          return `<div class="assertion ${a.passed ? 'passed' : 'failed'}">
+            ${a.passed ? '✓' : '✗'} ${escapeHtml(a.type)}: ${escapeHtml(value)}
+            ${!a.passed && a.message ? `<br><small>${escapeHtml(a.message)}</small>` : ''}
+          </div>`;
+        }).join('\n')}
+      </div>` : '';
+
+    return `
+      <details class="run-item ${statusClass}">
+        <summary class="run-header">
+          ${statusIcon} 运行 ${run.run_index + 1} - ${run.status.toUpperCase()} (${run.duration_ms}ms)
+        </summary>
+        <div class="run-content">
+          ${errorHtml}
+          ${outputHtml}
+          ${assertionsHtml}
+        </div>
+      </details>`;
+  }).join('\n');
+
+  return `
+    ${statsHtml}
+    <div class="run-details-section">
+      <h4>运行详情</h4>
+      ${runsDetailsHtml}
+    </div>`;
+}
+
+/**
+ * 格式化断言统计表格
+ */
+function formatAssertionSummariesHtml(assertionSummaries: AssertionSummary[]): string {
+  return `
+    <div class="assertion-summaries">
+      <h4>断言统计</h4>
+      <table class="assertion-summary-table">
+        <tr>
+          <th>断言类型</th>
+          <th>断言值</th>
+          <th>通过次数</th>
+          <th>要求</th>
+          <th>状态</th>
+        </tr>
+        ${assertionSummaries.map(as => {
+          const value = typeof as.value === 'string' ? as.value : `${JSON.stringify(as.value)}`;
+          const passRate = `${as.passed_runs}/${as.total_runs || assertionSummaries.length > 0 ? (assertionSummaries[0] as AssertionSummary).passed_runs : 0}`;
+          const statusClass = as.status === 'passed' ? 'assertion-summary-passed' : 'assertion-summary-failed';
+          const statusIcon = as.status === 'passed' ? '✓' : '✗';
+          return `<tr>
+            <td>${escapeHtml(as.type)}</td>
+            <td><code>${escapeHtml(value)}</code></td>
+            <td>${as.passed_runs}/${as.passed_runs + as.failures.length}</td>
+            <td>≥ ${as.min_pass}</td>
+            <td class="${statusClass}">${statusIcon} ${as.status.toUpperCase()}</td>
+          </tr>`;
+        }).join('\n')}
+      </table>
     </div>`;
 }

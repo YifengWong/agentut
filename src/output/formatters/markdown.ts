@@ -1,4 +1,4 @@
-import type { TestResult, ScenarioResult, StepResult, OpenCodeRunOutput } from '../../types/index.js';
+import type { TestResult, ScenarioResult, StepResult, OpenCodeRunOutput, RunExecution, StepSummary } from '../../types/index.js';
 
 interface ToolCallInfo {
   tool: string;
@@ -145,6 +145,11 @@ function formatScenario(scenario: ScenarioResult): string {
 
   lines.push('');
 
+  // Multi-run table for probabilistic tests (display before Steps)
+  if (scenario.steps.length > 0 && scenario.steps[0].runs && scenario.steps[0].runs.length > 1 && scenario.steps[0].summary) {
+    lines.push(formatRunsTableMarkdown(scenario.steps[0].runs, scenario.steps[0].summary));
+  }
+
   // Steps
   if (scenario.steps.length > 0) {
     lines.push('#### Steps');
@@ -186,6 +191,51 @@ function formatStep(step: StepResult, index: number): string {
   if (step.actual_output && step.actual_output.length > 0) {
     lines.push('');
     lines.push(formatSessionOutputMarkdown(step.actual_output, step.input));
+  }
+
+  lines.push('');
+
+  return lines.join('\n');
+}
+
+/**
+ * Format multi-run table for probabilistic tests (Markdown concise mode)
+ * Returns empty string if runs.length <= 1 (single run scenario)
+ */
+function formatRunsTableMarkdown(runs: RunExecution[], summary: StepSummary): string {
+  // Single run scenario - no table needed
+  if (!runs || runs.length <= 1) {
+    return '';
+  }
+
+  const lines: string[] = [];
+
+  // Run summary
+  const statusIcon = summary.status === 'passed' ? '✅' : '❌';
+  lines.push(`**运行统计:** ${summary.total_runs} 次运行, ${summary.passed_runs} 次通过, 要求 ≥ ${summary.min_pass} (${statusIcon} ${summary.status.toUpperCase()})`);
+  lines.push('');
+
+  // Run details table
+  lines.push('#### 运行详情');
+  lines.push('');
+  lines.push('| 运行 | 状态 | 耗时 | 断言 |');
+  lines.push('|------|------|------|------|');
+
+  for (const run of runs) {
+    const icon = run.status === 'passed' ? '✅' : '❌';
+    const duration = `${run.duration_ms}ms`;
+
+    // Count passed assertions
+    const passedCount = run.assertions.filter(a => a.passed).length;
+    const totalCount = run.assertions.length;
+    let assertionStr = `${passedCount}/${totalCount}`;
+
+    // Append error if exists
+    if (run.error) {
+      assertionStr += ` (${run.error})`;
+    }
+
+    lines.push(`| ${run.run_index} | ${icon} ${run.status} | ${duration} | ${assertionStr} |`);
   }
 
   lines.push('');
