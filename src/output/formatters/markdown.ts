@@ -128,6 +128,11 @@ function formatScenario(scenario: ScenarioResult): string {
   const statusIcon = scenario.status === 'passed' ? '✅' : '❌';
   const statusText = scenario.status.toUpperCase();
 
+  // 判断是否为多运行场景
+  const isMultiRunScenario = scenario.steps.length > 0 &&
+    !!scenario.steps[0].runs &&
+    scenario.steps[0].runs!.length > 1;
+
   lines.push(`### ${scenario.name}`);
   lines.push('');
   lines.push(`**Status:** ${statusIcon} ${statusText}`);
@@ -146,8 +151,8 @@ function formatScenario(scenario: ScenarioResult): string {
   lines.push('');
 
   // Multi-run table for probabilistic tests (display before Steps)
-  if (scenario.steps.length > 0 && scenario.steps[0].runs && scenario.steps[0].runs.length > 1 && scenario.steps[0].summary) {
-    lines.push(formatRunsTableMarkdown(scenario.steps[0].runs, scenario.steps[0].summary));
+  if (isMultiRunScenario && scenario.steps[0].summary) {
+    lines.push(formatRunsTableMarkdown(scenario.steps[0].runs!, scenario.steps[0].summary!));
   }
 
   // Steps
@@ -157,7 +162,7 @@ function formatScenario(scenario: ScenarioResult): string {
 
     for (let i = 0; i < scenario.steps.length; i++) {
       const step = scenario.steps[i];
-      lines.push(formatStep(step, i + 1));
+      lines.push(formatStep(step, i + 1, isMultiRunScenario));
     }
   }
 
@@ -167,7 +172,7 @@ function formatScenario(scenario: ScenarioResult): string {
   return lines.join('\n');
 }
 
-function formatStep(step: StepResult, index: number): string {
+function formatStep(step: StepResult, index: number, isMultiRunScenario: boolean): string {
   const lines: string[] = [];
 
   const statusIcon = step.status === 'passed' ? '✓' : '✗';
@@ -176,7 +181,8 @@ function formatStep(step: StepResult, index: number): string {
   lines.push(`   - Status: ${statusIcon} ${step.status}`);
   lines.push(`   - Duration: ${step.duration_ms}ms`);
 
-  if (step.assertions.length > 0) {
+  // 只在单运行场景展示 assertions（多运行场景已在运行详情表格中展示）
+  if (!isMultiRunScenario && step.assertions.length > 0) {
     lines.push('   - Assertions:');
     for (const assertion of step.assertions) {
       const icon = assertion.passed ? '✓' : '✗';
@@ -187,8 +193,8 @@ function formatStep(step: StepResult, index: number): string {
     }
   }
 
-  // Session Output
-  if (step.actual_output && step.actual_output.length > 0) {
+  // Session Output - 只在单运行场景展示（多运行场景不展示，保持简洁）
+  if (!isMultiRunScenario && step.actual_output && step.actual_output.length > 0) {
     lines.push('');
     lines.push(formatSessionOutputMarkdown(step.actual_output, step.input));
   }

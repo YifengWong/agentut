@@ -109,6 +109,11 @@ details[open] > .run-header::before { content: '▼ '; }
 }
 
 function formatScenario(scenario: ScenarioResult): string {
+  // 判断是否为多运行场景：检查第一个 step 是否有 runs 且长度大于 1
+  const isMultiRunScenario = scenario.steps.length > 0 &&
+    !!scenario.steps[0].runs &&
+    scenario.steps[0].runs!.length > 1;
+
   return `
     <div class="scenario">
       <div class="scenario-header">
@@ -121,19 +126,22 @@ function formatScenario(scenario: ScenarioResult): string {
       ${scenario.error ? `<div class="error"><strong>Error:</strong> ${escapeHtml(scenario.error)}</div>` : ''}
       ${scenario.steps.length > 0 ? `
         <h4>Steps</h4>
-        ${scenario.steps.map((step, i) => formatStep(step, i + 1)).join('\n')}
+        ${scenario.steps.map((step, i) => formatStep(step, i + 1, isMultiRunScenario)).join('\n')}
       ` : ''}
     </div>`;
 }
 
-function formatStep(step: StepResult, index: number): string {
+function formatStep(step: StepResult, index: number, isMultiRunScenario: boolean): string {
+  // 判断该步骤是否有多运行数据（只有第一个步骤会有）
+  const hasRunsDetail = step.runs && step.runs.length > 1 && step.summary;
+
   return `
     <div class="step">
       <div class="step-header">${index}. Input: "${escapeHtml(step.input)}"</div>
       <div class="meta">Status: ${step.status} | Duration: ${step.duration_ms}ms</div>
-      ${step.runs && step.runs.length > 1 && step.summary ? formatRunsDetailHtml(step.runs, step.summary, step.assertionSummaries) : ''}
-      ${!step.runs || step.runs.length <= 1 ? (step.actual_output ? formatSessionOutputHtml(step.actual_output, step.input) : '') : ''}
-      ${step.assertions.length > 0 ? `
+      ${hasRunsDetail ? formatRunsDetailHtml(step.runs!, step.summary!, step.assertionSummaries) : ''}
+      ${step.actual_output ? formatSessionOutputHtml(step.actual_output, step.input) : ''}
+      ${!isMultiRunScenario && step.assertions.length > 0 ? `
         <div class="assertions">
           ${step.assertions.map(a => {
             const value = typeof a.value === 'string' ? a.value : `${JSON.stringify(a.value)}`;
