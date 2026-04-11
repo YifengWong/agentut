@@ -75,7 +75,6 @@ program
   .option('--parallel', 'Run scenarios in parallel')
   .option('-m, --model <model>', 'Override model (provider/model)')
   .option('-a, --agent <agent>', 'Override agent')
-  .option('--verbose', 'Show detailed output')
   // 概率测试选项
   .option('--runs <n>', 'Override runs configuration', parseInt)
   .option('--min-pass <n>', 'Override min_pass configuration', parseInt)
@@ -89,7 +88,6 @@ program
         parallel: options.parallel,
         model: options.model,
         agent: options.agent,
-        verbose: options.verbose,
         runs: options.runs,
         min_pass: options.minPass,
         quick: options.quick

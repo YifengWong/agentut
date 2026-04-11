@@ -25,7 +25,6 @@ export interface RunOptions {
   scenario?: string;
   format?: 'json' | 'markdown' | 'html' | 'jest';
   output?: string;
-  verbose?: boolean;
   parallel?: boolean;
   model?: string;
   agent?: string;
@@ -69,7 +68,6 @@ export async function runTests(
   for (let i = 0; i < scenarios.length; i++) {
     const scenario = scenarios[i];
     const result = await executeScenario(suite, scenario, yamlDirectory, tempRoot, {
-      verbose: options.verbose,
       model: options.model,
       agent: options.agent,
       current: i + 1,
@@ -108,7 +106,6 @@ async function executeScenario(
   yamlDirectory: string,
   tempRoot: string,
   options?: {
-    verbose?: boolean;
     model?: string;
     agent?: string;
     current?: number;
@@ -256,7 +253,7 @@ async function executeScenario(
             status: stepPassed ? 'passed' : 'failed',
             duration_ms: stepDuration,
             assertions: assertionResults,
-            actual_output: options?.verbose ? runResult.outputs : undefined
+            actual_output: runResult.outputs
           };
 
           runStepResults.push(stepResult);

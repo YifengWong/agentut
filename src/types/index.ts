@@ -300,6 +300,11 @@ export interface StepResult {
   status: 'passed' | 'failed';
   duration_ms: number;
   assertions: AssertionResult[];  // 保持必填，向后兼容
+  actual_output?: OpenCodeRunOutput[];  // 实际输出，供 formatter 使用
+  // 概率测试扩展字段（仅在多运行场景时填充）
+  runs?: RunExecution[];  // 每次运行的详细信息
+  summary?: StepSummary;  // 步骤汇总
+  assertionSummaries?: AssertionSummary[];  // 断言汇总
   // 概率测试：断言级统计
   assertionStats?: AssertionStat[];
 }
