@@ -146,11 +146,10 @@ describe('formatAsHtml - Steps', () => {
 
     expect(html).toContain('Step 1 input');
     expect(html).toContain('Step 2 input');
-    expect(html).toContain('should_call_tool');
-    expect(html).toContain('response_contains');
+    // Assertions are now shown only in Run Details, not in step display
   });
 
-  it('should display session output for each step', () => {
+  it('should display session output in Run Details for multi-run scenario', () => {
     const step1Output: OpenCodeRunOutput[] = [
       { type: 'text', part: { text: 'Step 1 response' } },
       { type: 'tool_use', part: { tool: 'write', state: { status: 'completed', input: { file: 'a.txt' } } } }
@@ -158,6 +157,55 @@ describe('formatAsHtml - Steps', () => {
     const step2Output: OpenCodeRunOutput[] = [
       { type: 'text', part: { text: 'Step 2 response' } },
       { type: 'tool_use', part: { tool: 'read', state: { status: 'completed', input: { file: 'b.txt' } } } }
+    ];
+
+    const runDetails: RunExecution[] = [
+      {
+        run_index: 1,
+        status: 'passed',
+        duration_ms: 200,
+        steps: [
+          {
+            step_index: 0,
+            input: 'Create file',
+            status: 'passed',
+            duration_ms: 100,
+            assertions: [{ type: 'should_call_tool', value: 'Write', passed: true, message: 'OK' }],
+            actual_output: step1Output
+          },
+          {
+            step_index: 1,
+            input: 'Read file',
+            status: 'passed',
+            duration_ms: 100,
+            assertions: [{ type: 'response_contains', value: 'success', passed: true, message: 'Found' }],
+            actual_output: step2Output
+          }
+        ]
+      },
+      {
+        run_index: 2,
+        status: 'passed',
+        duration_ms: 180,
+        steps: [
+          {
+            step_index: 0,
+            input: 'Create file',
+            status: 'passed',
+            duration_ms: 90,
+            assertions: [],
+            actual_output: step1Output
+          },
+          {
+            step_index: 1,
+            input: 'Read file',
+            status: 'passed',
+            duration_ms: 90,
+            assertions: [],
+            actual_output: step2Output
+          }
+        ]
+      }
     ];
 
     const result: TestResult = {
@@ -169,35 +217,41 @@ describe('formatAsHtml - Steps', () => {
           environment: 'default',
           status: 'passed',
           duration_ms: 200,
+        runs: 2,
+          passed_runs: 2,
           steps: [
             {
               input: 'Create file',
               status: 'passed',
               duration_ms: 100,
               assertions: [],
-              actual_output: step1Output
+              assertionStats: [
+                { type: 'should_call_tool', value: 'Write', passed_runs: 2, total_runs: 2, pass_rate: 100, status: 'passed' }
+              ]
             },
             {
               input: 'Read file',
               status: 'passed',
               duration_ms: 100,
               assertions: [],
-              actual_output: step2Output
+              assertionStats: [
+                { type: 'response_contains', value: 'success', passed_runs: 2, total_runs: 2, pass_rate: 100, status: 'passed' }
+              ]
             }
-          ]
+          ],
+          runDetails
         }
       ]
     };
 
     const html = formatAsHtml(result);
 
-    // Step 1 session output
-    expect(html).toContain('Create file');
+    // Step display should only show stats, not session
+    expect(html).toContain('assertion-stats-table');
+    // Session output should be in Run Details section
+    expect(html).toContain('run-details-section');
     expect(html).toContain('Step 1 response');
     expect(html).toContain('<td>write</td>');
-
-    // Step 2 session output
-    expect(html).toContain('Read file');
     expect(html).toContain('Step 2 response');
     expect(html).toContain('<td>read</td>');
   });
@@ -405,7 +459,24 @@ describe('formatAsHtml - Run Details Tabs', () => {
     expect(html).toContain('Run Details');
   });
 
-  it('should NOT display run details HTML content for single run', () => {
+  it('should display run details section for single run when runDetails available', () => {
+    const runDetails: RunExecution[] = [
+      {
+        run_index: 1,
+        status: 'passed',
+        duration_ms: 100,
+        steps: [
+          {
+            step_index: 0,
+            input: 'Test',
+            status: 'passed',
+            duration_ms: 50,
+            assertions: [{ type: 'test', value: 'val', passed: true }]
+          }
+        ]
+      }
+    ];
+
     const result: TestResult = {
       suite: { name: 'test', description: '', file: './test.yaml' },
       summary: { total_scenarios: 1, passed: 1, failed: 0, duration_ms: 100, timestamp: '' },
@@ -420,18 +491,19 @@ describe('formatAsHtml - Run Details Tabs', () => {
               input: 'Test',
               status: 'passed',
               duration_ms: 50,
-              assertions: [{ type: 'test', value: 'val', passed: true }]
+              assertions: []
             }
-          ]
+          ],
+          runDetails
         }
       ]
     };
 
     const html = formatAsHtml(result);
 
-    // Should NOT have run details HTML section for single runs (CSS styles are global)
-    expect(html).not.toContain('run-details-section">');
-    expect(html).not.toContain('Run Details</strong>');
+    // Should display run details section for single runs when runDetails exists
+    expect(html).toContain('run-details-section');
+    expect(html).toContain('Run Details');
   });
 
   it('should display tab buttons for each run', () => {
@@ -671,9 +743,27 @@ describe('formatAsHtml - Edge Cases', () => {
     expect(html).toContain('FAILED');
   });
 
-  it('should handle step with actual_output containing tool calls', () => {
+  it('should handle step with actual_output in runDetails containing tool calls', () => {
     const output: OpenCodeRunOutput[] = [
       { type: 'tool_use', part: { tool: 'write', state: { status: 'completed', input: { file: 'test.txt' } } } }
+    ];
+
+    const runDetails: RunExecution[] = [
+      {
+        run_index: 1,
+        status: 'passed',
+        duration_ms: 100,
+        steps: [
+          {
+            step_index: 0,
+            input: 'Write file',
+            status: 'passed',
+            duration_ms: 50,
+            assertions: [],
+            actual_output: output
+          }
+        ]
+      }
     ];
 
     const result: TestResult = {
@@ -690,16 +780,18 @@ describe('formatAsHtml - Edge Cases', () => {
               input: 'Write file',
               status: 'passed',
               duration_ms: 50,
-              assertions: [],
-              actual_output: output
+              assertions: []
             }
-          ]
+          ],
+          runDetails
         }
       ]
     };
 
     const html = formatAsHtml(result);
 
+    // Tool calls should be in Run Details, not in step display
+    expect(html).toContain('run-details-section');
     expect(html).toContain('Tool Calls');
     expect(html).toContain('<td>write</td>');
     expect(html).toContain('completed');

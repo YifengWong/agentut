@@ -272,7 +272,7 @@ export function formatAsHtml(result: TestResult): string {
 
 function formatScenario(scenario: ScenarioResult): string {
   const scenarioId = generateScenarioId(scenario.name);
-  const hasRunDetails = scenario.runDetails && scenario.runDetails.length > 1;
+  const hasRunDetails = scenario.runDetails && scenario.runDetails.length > 0;
   const runsInfo = scenario.runs && scenario.passed_runs
     ? `${scenario.passed_runs}/${scenario.runs} runs passed`
     : '';
@@ -305,18 +305,6 @@ function formatStep(step: StepResult, index: number): string {
     <div class="step">
       <div class="step-header">${index}. Input: "${escapeHtml(step.input)}"</div>
       <div class="meta">Status: ${step.status} | Duration: ${step.duration_ms}ms</div>
-      ${step.actual_output ? formatSessionOutputHtml(step.actual_output, step.input) : ''}
-      ${step.assertions.length > 0 ? `
-        <div class="assertions">
-          ${step.assertions.map(a => {
-            const value = typeof a.value === 'string' ? a.value : `${JSON.stringify(a.value)}`;
-            return `<div class="assertion ${a.passed ? 'passed' : 'failed'}">
-              ${a.passed ? '' : ''} ${escapeHtml(a.type)}: ${escapeHtml(value)}
-              ${!a.passed && a.message ? `<br><small>${escapeHtml(a.message)}</small>` : ''}
-            </div>`;
-          }).join('\n')}
-        </div>
-      ` : ''}
       ${step.assertionStats && step.assertionStats.length > 0 ? formatAssertionStatsTable(step.assertionStats) : ''}
     </div>`;
 }
