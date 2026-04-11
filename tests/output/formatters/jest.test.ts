@@ -113,4 +113,31 @@ describe('formatAsJest', () => {
     expect(formatAsJest(passedResult).success).toBe(true);
     expect(formatAsJest(failedResult).success).toBe(false);
   });
+
+  it('should handle multi-run scenario correctly', () => {
+    const result: TestResult = {
+      suite: { name: 'test', description: '', file: './test.yaml' },
+      summary: { total_scenarios: 1, passed: 1, failed: 0, duration_ms: 5000, timestamp: '' },
+      scenarios: [
+        {
+          name: 'probabilistic-test',
+          environment: 'default',
+          status: 'passed',
+          duration_ms: 5000,
+          runs: 5,
+          min_pass: 4,
+          passed_runs: 4,
+          steps: [
+            { input: 'Test', status: 'passed', duration_ms: 4800, assertions: [] }
+          ]
+        }
+      ]
+    };
+
+    const jest = formatAsJest(result);
+
+    expect(jest.numTotalTests).toBe(1);
+    expect(jest.numPassedTests).toBe(1);
+    expect(jest.success).toBe(true);
+  });
 });
