@@ -224,6 +224,7 @@ export interface ScenarioResult {
   runs?: number;
   min_pass?: number;
   passed_runs?: number;
+  runDetails?: RunExecution[];  // 新增：存储每次运行的详细信息
 }
 
 // ========== Probabilistic Test Types ==========
@@ -237,13 +238,38 @@ export interface AssertionFailure {
 }
 
 /**
+ * 断言级别的统计信息
+ */
+export interface AssertionStat {
+  type: string;
+  value: string | Matcher | ToolCallAssertion | FileContentAssertion | { file: string; text: string };
+  passed_runs: number;
+  total_runs: number;
+  pass_rate: number;  // 百分比，0-100
+  status: 'passed' | 'failed';
+}
+
+/**
+ * 单次运行中的步骤详情
+ */
+export interface RunStepDetail {
+  step_index: number;
+  input: string;
+  status: 'passed' | 'failed';
+  duration_ms: number;
+  assertions: AssertionResult[];
+  actual_output?: OpenCodeRunOutput[];
+}
+
+/**
  * 单次运行的执行结果
  */
 export interface RunExecution {
   run_index: number;
   status: 'passed' | 'failed';
   duration_ms: number;
-  assertions: AssertionResult[];
+  assertions?: AssertionResult[];  // 保留兼容：旧的汇总断言
+  steps?: RunStepDetail[];  // 新增：步骤级详情
   error?: string;
 }
 
@@ -273,12 +299,9 @@ export interface StepResult {
   input: string;
   status: 'passed' | 'failed';
   duration_ms: number;
-  assertions: AssertionResult[];
-  actual_output?: OpenCodeRunOutput[];
-  // 概率测试扩展字段
-  runs?: RunExecution[];
-  summary?: StepSummary;
-  assertionSummaries?: AssertionSummary[];
+  assertions: AssertionResult[];  // 保持必填，向后兼容
+  // 概率测试：断言级统计
+  assertionStats?: AssertionStat[];
 }
 
 export interface AssertionResult {

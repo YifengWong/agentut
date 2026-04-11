@@ -12,9 +12,12 @@ import {
   type ToolCallAssertion,
   type FileContentAssertion,
   type StepResult,
+  type ScenarioResult,
   type RunExecution,
   type AssertionSummary,
-  type AssertionFailure
+  type AssertionFailure,
+  type AssertionStat,
+  type RunStepDetail
 } from '../../src/types/index.js';
 
 describe('Error Classes', () => {
@@ -233,25 +236,108 @@ describe('Probabilistic test types', () => {
     });
   });
 
-  describe('StepResult extended structure', () => {
-    it('should support runs array structure', () => {
+  describe('StepResult assertionStats field', () => {
+    it('should support assertionStats field', () => {
       const step: StepResult = {
         input: 'Create file',
         status: 'passed',
-        runs: [
-          { run_index: 1, status: 'passed', duration_ms: 1000, assertions: [] }
-        ],
-        summary: {
-          total_runs: 1,
-          passed_runs: 1,
-          min_pass: 1,
-          status: 'passed'
-        },
+        duration_ms: 1000,
         assertions: [],
-        duration_ms: 1000
+        assertionStats: [
+          { type: 'should_call_tool', value: 'Write', passed_runs: 5, total_runs: 5, pass_rate: 100, status: 'passed' }
+        ]
       };
-      expect(step.runs).toHaveLength(1);
-      expect(step.summary?.status).toBe('passed');
+      expect(step.assertionStats).toHaveLength(1);
+      expect(step.assertionStats![0].pass_rate).toBe(100);
+    });
+  });
+
+  describe('ScenarioResult.runDetails field', () => {
+    it('should support runDetails field', () => {
+      const scenario: ScenarioResult = {
+        name: 'test',
+        environment: 'default',
+        status: 'passed',
+        duration_ms: 1000,
+        steps: [],
+        runDetails: [
+          {
+            run_index: 0,
+            status: 'passed',
+            duration_ms: 1000,
+            steps: []
+          }
+        ]
+      };
+      expect(scenario.runDetails).toHaveLength(1);
+      expect(scenario.runDetails![0].run_index).toBe(0);
+    });
+  });
+
+  describe('AssertionStat type', () => {
+    it('should support assertion-level statistics', () => {
+      const stat: AssertionStat = {
+        type: 'should_call_tool',
+        value: 'Write',
+        passed_runs: 4,
+        total_runs: 5,
+        pass_rate: 80,
+        status: 'passed'
+      };
+      expect(stat.pass_rate).toBe(80);
+      expect(stat.passed_runs).toBe(4);
+    });
+
+    it('should mark failed status when pass_rate below threshold', () => {
+      const stat: AssertionStat = {
+        type: 'response_contains',
+        value: 'success',
+        passed_runs: 2,
+        total_runs: 5,
+        pass_rate: 40,
+        status: 'failed'
+      };
+      expect(stat.status).toBe('failed');
+    });
+  });
+
+  describe('RunStepDetail type', () => {
+    it('should capture step details within a run', () => {
+      const stepDetail: RunStepDetail = {
+        step_index: 0,
+        input: 'Create file',
+        status: 'passed',
+        duration_ms: 1000,
+        assertions: [
+          { type: 'should_call_tool', value: 'Write', passed: true, message: 'OK' }
+        ],
+        actual_output: [
+          { type: 'text', part: { text: 'Creating file...' } }
+        ]
+      };
+      expect(stepDetail.step_index).toBe(0);
+      expect(stepDetail.actual_output).toHaveLength(1);
+    });
+  });
+
+  describe('RunExecution extended structure', () => {
+    it('should include steps array with RunStepDetail', () => {
+      const run: RunExecution = {
+        run_index: 0,
+        status: 'passed',
+        duration_ms: 5000,
+        steps: [
+          {
+            step_index: 0,
+            input: 'Create file',
+            status: 'passed',
+            duration_ms: 1000,
+            assertions: []
+          }
+        ]
+      };
+      expect(run.steps).toHaveLength(1);
+      expect(run.steps[0].step_index).toBe(0);
     });
   });
 });
