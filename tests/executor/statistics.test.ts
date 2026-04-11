@@ -3,9 +3,10 @@ import {
   calculateStepSummary,
   calculateAssertionSummaries,
   determineScenarioStatus,
+  calculateAssertionStats,
   type RunExecutionWithAssertions
 } from '../../src/executor/statistics.js';
-import type { AssertionResult, Assertion } from '../../src/types/index.js';
+import type { AssertionResult, Assertion, RunExecution } from '../../src/types/index.js';
 
 describe('statistics module', () => {
   describe('calculateStepSummary', () => {
@@ -251,6 +252,143 @@ describe('statistics module', () => {
       const status = determineScenarioStatus(stepSummary, assertionSummaries);
 
       expect(status).toBe('passed');
+    });
+  });
+
+  describe('calculateAssertionStats', () => {
+    const createAssertionResult = (
+      type: string,
+      value: any,
+      passed: boolean,
+      message?: string
+    ): AssertionResult => ({
+      type,
+      value,
+      passed,
+      message: message || (passed ? 'OK' : 'Failed')
+    });
+
+    it('should calculate pass rate and status for each assertion', () => {
+      const runs: RunExecution[] = [
+        {
+          run_index: 0,
+          status: 'passed',
+          duration_ms: 1000,
+          steps: [{
+            step_index: 0,
+            input: 'test',
+            status: 'passed',
+            duration_ms: 1000,
+            assertions: [
+              createAssertionResult('should_call_tool', 'Write', true),
+              createAssertionResult('response_contains', 'done', true)
+            ]
+          }]
+        },
+        {
+          run_index: 1,
+          status: 'passed',
+          duration_ms: 1000,
+          steps: [{
+            step_index: 0,
+            input: 'test',
+            status: 'passed',
+            duration_ms: 1000,
+            assertions: [
+              createAssertionResult('should_call_tool', 'Write', true),
+              createAssertionResult('response_contains', 'done', false, 'Not found')
+            ]
+          }]
+        },
+        {
+          run_index: 2,
+          status: 'failed',
+          duration_ms: 2000,
+          steps: [{
+            step_index: 0,
+            input: 'test',
+            status: 'failed',
+            duration_ms: 2000,
+            assertions: [
+              createAssertionResult('should_call_tool', 'Write', false, 'Tool not called'),
+              createAssertionResult('response_contains', 'done', false, 'Not found')
+            ]
+          }]
+        }
+      ];
+
+      const assertions: Assertion[] = [
+        { should_call_tool: 'Write' },
+        { response_contains: 'done' }
+      ];
+
+      const stats = calculateAssertionStats(runs, assertions, 2);
+
+      expect(stats).toHaveLength(2);
+
+      // should_call_tool: 2/3 passed, pass_rate = 67%
+      expect(stats[0].type).toBe('should_call_tool');
+      expect(stats[0].passed_runs).toBe(2);
+      expect(stats[0].total_runs).toBe(3);
+      expect(stats[0].pass_rate).toBe(67);
+      expect(stats[0].status).toBe('passed'); // 2 >= 2
+
+      // response_contains: 1/3 passed, pass_rate = 33%
+      expect(stats[1].type).toBe('response_contains');
+      expect(stats[1].passed_runs).toBe(1);
+      expect(stats[1].pass_rate).toBe(33);
+      expect(stats[1].status).toBe('failed'); // 1 < 2
+    });
+
+    it('should handle single run scenario', () => {
+      const runs: RunExecution[] = [
+        {
+          run_index: 0,
+          status: 'passed',
+          duration_ms: 1000,
+          steps: [{
+            step_index: 0,
+            input: 'test',
+            status: 'passed',
+            duration_ms: 1000,
+            assertions: [
+              createAssertionResult('should_call_tool', 'Write', true)
+            ]
+          }]
+        }
+      ];
+
+      const assertions: Assertion[] = [
+        { should_call_tool: 'Write' }
+      ];
+
+      const stats = calculateAssertionStats(runs, assertions, 1);
+
+      expect(stats).toHaveLength(1);
+      expect(stats[0].passed_runs).toBe(1);
+      expect(stats[0].total_runs).toBe(1);
+      expect(stats[0].pass_rate).toBe(100);
+    });
+
+    it('should return empty array for no assertions', () => {
+      const runs: RunExecution[] = [
+        {
+          run_index: 0,
+          status: 'passed',
+          duration_ms: 1000,
+          steps: [{
+            step_index: 0,
+            input: 'test',
+            status: 'passed',
+            duration_ms: 1000,
+            assertions: []
+          }]
+        }
+      ];
+
+      const stats = calculateAssertionStats(runs, [], 1);
+
+      expect(stats).toHaveLength(0);
     });
   });
 });

@@ -6,7 +6,9 @@ import type {
   AssertionResult,
   Matcher,
   ToolCallAssertion,
-  FileContentAssertion
+  FileContentAssertion,
+  RunExecution,
+  AssertionStat
 } from '../types/index.js';
 
 /**
@@ -172,4 +174,57 @@ export function determineScenarioStatus(
   }
 
   return 'passed';
+}
+
+/**
+ * 计算各断言的统计信息（新版，用于 StepResult.assertionStats）
+ */
+export function calculateAssertionStats(
+  runs: RunExecution[],
+  assertions: Assertion[],
+  minPass: number
+): AssertionStat[] {
+  if (assertions.length === 0) {
+    return [];
+  }
+
+  const stats: AssertionStat[] = [];
+
+  for (let i = 0; i < assertions.length; i++) {
+    const assertion = assertions[i];
+    const type = getAssertionType(assertion);
+    const value = getAssertionValue(assertion);
+    const assertionMinPass = getAssertionMinPass(assertion, minPass);
+
+    // 统计该断言在各次运行中的通过情况
+    let passedRuns = 0;
+
+    for (const run of runs) {
+      // 收集所有步骤的断言结果
+      const allAssertions = run.steps ? run.steps.flatMap(s => s.assertions) : [];
+      // 按索引匹配（假设各次运行的断言顺序一致）
+      const assertionResult = allAssertions[i];
+
+      if (assertionResult && assertionResult.passed) {
+        passedRuns++;
+      }
+    }
+
+    const totalRuns = runs.length;
+    const passRate = totalRuns > 0 ? Math.round((passedRuns / totalRuns) * 100) : 0;
+    const status = passedRuns >= assertionMinPass ? 'passed' : 'failed';
+
+    if (value !== undefined) {
+      stats.push({
+        type,
+        value,
+        passed_runs: passedRuns,
+        total_runs: totalRuns,
+        pass_rate: passRate,
+        status
+      });
+    }
+  }
+
+  return stats;
 }
