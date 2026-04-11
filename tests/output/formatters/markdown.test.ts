@@ -1,31 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { formatAsMarkdown, formatSessionOutputMarkdown } from '../../../src/output/formatters/markdown.js';
+import { formatAsMarkdown } from '../../../src/output/formatters/markdown.js';
 import type { TestResult, ScenarioResult, StepResult, OpenCodeRunOutput } from '../../../src/types/index.js';
 
-// Test fixtures for formatSessionOutputMarkdown
-const mockSessionOutput: OpenCodeRunOutput[] = [
-  { type: 'text', part: { text: '好的，我来帮你创建这个文件。' } },
-  { type: 'tool_use', part: { tool: 'write', state: {
-    status: 'completed',
-    input: { filePath: '/tmp/hello.txt', content: 'Hello World' }
-  }}},
-  { type: 'tool_use', part: { tool: 'read', state: {
-    status: 'completed',
-    input: { filePath: '/tmp/hello.txt' }
-  }}},
-  { type: 'text', part: { text: '文件已成功创建。' } }
-];
-
-const mockErrorOutput: OpenCodeRunOutput[] = [
-  { type: 'tool_use', part: { tool: 'read', state: {
-    status: 'error',
-    input: { filePath: '/nonexistent.txt' },
-    error: 'File not found'
-  }}}
-];
-
-describe('formatAsMarkdown', () => {
-  it('should generate markdown format', () => {
+describe('formatAsMarkdown (simplified)', () => {
+  it('should generate markdown format with basic structure', () => {
     const result: TestResult = {
       suite: { name: 'test-suite', description: 'Test', file: './test.yaml' },
       summary: { total_scenarios: 1, passed: 1, failed: 0, duration_ms: 100, timestamp: '2026-03-29T10:30:00Z' },
@@ -75,7 +53,30 @@ describe('formatAsMarkdown', () => {
     expect(markdown).toContain('**Duration:** 100ms');
   });
 
-  it('should display assertion results', () => {
+  it('should display runs info when multi-run scenario', () => {
+    const result: TestResult = {
+      suite: { name: 'test', description: '', file: './test.yaml' },
+      summary: { total_scenarios: 1, passed: 1, failed: 0, duration_ms: 500, timestamp: '' },
+      scenarios: [
+        {
+          name: 'multi-run-scenario',
+          environment: 'default',
+          status: 'passed',
+          duration_ms: 500,
+          runs: 5,
+          passed_runs: 4,
+          min_pass: 3,
+          steps: []
+        }
+      ]
+    };
+
+    const markdown = formatAsMarkdown(result);
+
+    expect(markdown).toContain('**Runs:** 4/5 passed (min_pass: 3)');
+  });
+
+  it('should NOT display detailed assertions in simplified mode', () => {
     const result: TestResult = {
       suite: { name: 'test', description: '', file: './test.yaml' },
       summary: { total_scenarios: 1, passed: 0, failed: 1, duration_ms: 100, timestamp: '' },
@@ -102,10 +103,97 @@ describe('formatAsMarkdown', () => {
 
     const markdown = formatAsMarkdown(result);
 
-    expect(markdown).toContain('should_call_tool: Write');
-    expect(markdown).toContain('✓');
-    expect(markdown).toContain('response_contains: success');
-    expect(markdown).toContain('✗');
+    // Should NOT contain assertion details
+    expect(markdown).not.toContain('Assertions:');
+    expect(markdown).not.toContain('should_call_tool: Write');
+    expect(markdown).not.toContain('response_contains: success');
+  });
+
+  it('should NOT display session output in simplified mode', () => {
+    const stepOutput: OpenCodeRunOutput[] = [
+      { type: 'text', part: { text: 'AI response text' } },
+      { type: 'tool_use', part: { tool: 'write', state: { status: 'completed', input: { file: 'test.txt' } } } }
+    ];
+
+    const result: TestResult = {
+      suite: { name: 'test', description: '', file: './test.yaml' },
+      summary: { total_scenarios: 1, passed: 1, failed: 0, duration_ms: 100, timestamp: '' },
+      scenarios: [
+        {
+          name: 'scenario-with-output',
+          environment: 'default',
+          status: 'passed',
+          duration_ms: 100,
+          steps: [
+            {
+              input: 'Create file',
+              status: 'passed',
+              duration_ms: 50,
+              assertions: [],
+              actual_output: stepOutput
+            }
+          ]
+        }
+      ]
+    };
+
+    const markdown = formatAsMarkdown(result);
+
+    // Should NOT contain session output details
+    expect(markdown).not.toContain('**Request:**');
+    expect(markdown).not.toContain('**Response:**');
+    expect(markdown).not.toContain('**Tool Calls:**');
+    expect(markdown).not.toContain('AI response text');
+    expect(markdown).not.toContain('| write |');
+    expect(markdown).not.toContain('<details>');
+    expect(markdown).not.toContain('Raw Output');
+  });
+
+  it('should display step status and duration only', () => {
+    const result: TestResult = {
+      suite: { name: 'test', description: '', file: './test.yaml' },
+      summary: { total_scenarios: 1, passed: 1, failed: 0, duration_ms: 200, timestamp: '' },
+      scenarios: [
+        {
+          name: 'multi-step-scenario',
+          environment: 'default',
+          status: 'passed',
+          duration_ms: 200,
+          steps: [
+            {
+              input: 'Step 1 input',
+              status: 'passed',
+              duration_ms: 100,
+              assertions: [{ type: 'should_call_tool', value: 'Write', passed: true, message: 'OK' }]
+            },
+            {
+              input: 'Step 2 input',
+              status: 'failed',
+              duration_ms: 100,
+              assertions: [{ type: 'response_contains', value: 'success', passed: false, message: 'Found' }]
+            }
+          ]
+        }
+      ]
+    };
+
+    const markdown = formatAsMarkdown(result);
+
+    // Should show step inputs and status
+    expect(markdown).toContain('1. **Input:** "Step 1 input"');
+    expect(markdown).toContain('2. **Input:** "Step 2 input"');
+
+    // Should show status with icons
+    expect(markdown).toContain('- Status: ✓ passed');
+    expect(markdown).toContain('- Status: ✗ failed');
+
+    // Should show duration
+    expect(markdown).toContain('- Duration: 100ms');
+
+    // Should NOT show assertion details
+    expect(markdown).not.toContain('Assertions:');
+    expect(markdown).not.toContain('should_call_tool');
+    expect(markdown).not.toContain('response_contains');
   });
 
   it('should display error for failed scenarios', () => {
@@ -126,7 +214,7 @@ describe('formatAsMarkdown', () => {
 
     const markdown = formatAsMarkdown(result);
 
-    expect(markdown).toContain('Error:');
+    expect(markdown).toContain('**Error:**');
     expect(markdown).toContain('Assertion failed: missing file');
   });
 
@@ -142,50 +230,10 @@ describe('formatAsMarkdown', () => {
     expect(markdown).toContain('No scenarios executed');
   });
 
-  it('should display multiple steps in a scenario', () => {
-    const result: TestResult = {
-      suite: { name: 'test', description: '', file: './test.yaml' },
-      summary: { total_scenarios: 1, passed: 1, failed: 0, duration_ms: 200, timestamp: '' },
-      scenarios: [
-        {
-          name: 'multi-step-scenario',
-          environment: 'default',
-          status: 'passed',
-          duration_ms: 200,
-          steps: [
-            {
-              input: 'Step 1 input',
-              status: 'passed',
-              duration_ms: 100,
-              assertions: [{ type: 'should_call_tool', value: 'Write', passed: true, message: 'OK' }]
-            },
-            {
-              input: 'Step 2 input',
-              status: 'passed',
-              duration_ms: 100,
-              assertions: [{ type: 'response_contains', value: 'success', passed: true, message: 'Found' }]
-            }
-          ]
-        }
-      ]
-    };
-
-    const markdown = formatAsMarkdown(result);
-
-    expect(markdown).toContain('1. **Input:** "Step 1 input"');
-    expect(markdown).toContain('2. **Input:** "Step 2 input"');
-    expect(markdown).toContain('should_call_tool: Write');
-    expect(markdown).toContain('response_contains: success');
-  });
-
-  it('should display session output for each step in multi-step scenario', () => {
-    const step1Output: OpenCodeRunOutput[] = [
+  it('should display multiple steps in a scenario without detailed assertions', () => {
+    const stepOutput: OpenCodeRunOutput[] = [
       { type: 'text', part: { text: 'Step 1 response' } },
       { type: 'tool_use', part: { tool: 'write', state: { status: 'completed', input: { file: 'a.txt' } } } }
-    ];
-    const step2Output: OpenCodeRunOutput[] = [
-      { type: 'text', part: { text: 'Step 2 response' } },
-      { type: 'tool_use', part: { tool: 'read', state: { status: 'completed', input: { file: 'b.txt' } } } }
     ];
 
     const result: TestResult = {
@@ -203,14 +251,14 @@ describe('formatAsMarkdown', () => {
               status: 'passed',
               duration_ms: 100,
               assertions: [],
-              actual_output: step1Output
+              actual_output: stepOutput
             },
             {
               input: 'Read file',
               status: 'passed',
               duration_ms: 100,
               assertions: [],
-              actual_output: step2Output
+              actual_output: []
             }
           ]
         }
@@ -219,83 +267,60 @@ describe('formatAsMarkdown', () => {
 
     const markdown = formatAsMarkdown(result);
 
-    // Step 1 session output
-    expect(markdown).toContain('> Create file');
-    expect(markdown).toContain('Step 1 response');
-    expect(markdown).toContain('| write |');
+    // Should show step inputs
+    expect(markdown).toContain('1. **Input:** "Create file"');
+    expect(markdown).toContain('2. **Input:** "Read file"');
 
-    // Step 2 session output
-    expect(markdown).toContain('> Read file');
-    expect(markdown).toContain('Step 2 response');
-    expect(markdown).toContain('| read |');
-  });
-});
+    // Should show status and duration
+    expect(markdown).toContain('- Status: ✓ passed');
+    expect(markdown).toContain('- Duration: 100ms');
 
-describe('formatSessionOutputMarkdown', () => {
-  it('should format complete session with text and tool calls', () => {
-    const result = formatSessionOutputMarkdown(mockSessionOutput, '创建文件');
-    expect(result).toContain('**Request:**');
-    expect(result).toContain('创建文件');
-    expect(result).toContain('**Response:**');
-    expect(result).toContain('好的，我来帮你创建这个文件。');
-    expect(result).toContain('**Tool Calls:**');
-    expect(result).toContain('| write | ✓ completed |');
-    expect(result).toContain('| read | ✓ completed |');
+    // Should NOT show session output
+    expect(markdown).not.toContain('Step 1 response');
+    expect(markdown).not.toContain('| write |');
+    expect(markdown).not.toContain('> Create file');
   });
 
-  it('should format tool call with error status', () => {
-    const result = formatSessionOutputMarkdown(mockErrorOutput, '读取文件');
-    expect(result).toContain('| read | ✗ error |');
-    expect(result).toContain('File not found');
+  it('should NOT display temp directory in simplified mode', () => {
+    const result: TestResult = {
+      suite: { name: 'test', description: '', file: './test.yaml' },
+      summary: { total_scenarios: 1, passed: 1, failed: 0, duration_ms: 100, timestamp: '' },
+      scenarios: [
+        {
+          name: 'scenario-with-temp',
+          environment: 'default',
+          status: 'passed',
+          duration_ms: 100,
+          tempDirectory: '/tmp/test-123',
+          steps: []
+        }
+      ]
+    };
+
+    const markdown = formatAsMarkdown(result);
+
+    // Temp directory should not be displayed in simplified mode
+    expect(markdown).not.toContain('Temp Directory');
+    expect(markdown).not.toContain('/tmp/test-123');
   });
 
-  it('should return empty string for empty output', () => {
-    const result = formatSessionOutputMarkdown([], 'test');
-    expect(result).toBe('');
-  });
+  it('should display scenario environment', () => {
+    const result: TestResult = {
+      suite: { name: 'test', description: '', file: './test.yaml' },
+      summary: { total_scenarios: 1, passed: 1, failed: 0, duration_ms: 100, timestamp: '' },
+      scenarios: [
+        {
+          name: 'scenario-1',
+          environment: 'production',
+          status: 'passed',
+          duration_ms: 100,
+          steps: []
+        }
+      ]
+    };
 
-  it('should escape pipe characters in table cells', () => {
-    const output: OpenCodeRunOutput[] = [
-      { type: 'tool_use', part: { tool: 'test', state: {
-        status: 'completed',
-        input: { path: 'file|name.txt' }
-      }}}
-    ];
-    const result = formatSessionOutputMarkdown(output, 'test');
-    expect(result).toContain('file\\|name.txt');
-  });
+    const markdown = formatAsMarkdown(result);
 
-  it('should return empty string for undefined input', () => {
-    const result = formatSessionOutputMarkdown(undefined, 'test');
-    expect(result).toBe('');
-  });
-
-  it('should format multiline text responses with quote prefix', () => {
-    const output: OpenCodeRunOutput[] = [
-      { type: 'text', part: { text: 'Line 1\nLine 2\nLine 3' } }
-    ];
-    const result = formatSessionOutputMarkdown(output, 'test');
-    expect(result).toContain('> Line 1');
-    expect(result).toContain('> Line 2');
-    expect(result).toContain('> Line 3');
-  });
-
-  it('should include raw output in collapsible section', () => {
-    const result = formatSessionOutputMarkdown(mockSessionOutput, 'test');
-    expect(result).toContain('<details>');
-    expect(result).toContain('<summary>Raw Output</summary>');
-    expect(result).toContain('```json');
-  });
-
-  it('should escape newlines in table cells', () => {
-    const output: OpenCodeRunOutput[] = [
-      { type: 'tool_use', part: { tool: 'test', state: {
-        status: 'completed',
-        input: { text: 'line1\nline2' }
-      }}}
-    ];
-    const result = formatSessionOutputMarkdown(output, 'test');
-    expect(result).toContain('line1 line2');
-    expect(result).not.toContain('line1\nline2');
+    expect(markdown).toContain('**Environment:** production');
   });
 });

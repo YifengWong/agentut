@@ -1,88 +1,4 @@
-import type { TestResult, ScenarioResult, StepResult, OpenCodeRunOutput } from '../../types/index.js';
-
-interface ToolCallInfo {
-  tool: string;
-  status: string;
-  input: Record<string, unknown>;
-  error?: string;
-}
-
-function escapeMarkdownTableCell(str: string): string {
-  return str.replace(/\|/g, '\\|').replace(/\n/g, ' ');
-}
-
-function extractTextResponses(outputs: OpenCodeRunOutput[]): string[] {
-  return outputs
-    .filter(output => output.type === 'text' && output.part?.text)
-    .map(output => output.part!.text as string);
-}
-
-function extractToolCalls(outputs: OpenCodeRunOutput[]): ToolCallInfo[] {
-  return outputs
-    .filter(output => output.type === 'tool_use' && output.part?.tool)
-    .map(output => ({
-      tool: output.part!.tool as string,
-      status: output.part?.state?.status || 'unknown',
-      input: output.part?.state?.input || {},
-      error: output.part?.state?.error
-    }));
-}
-
-export function formatSessionOutputMarkdown(
-  outputs: OpenCodeRunOutput[] | undefined,
-  request: string
-): string {
-  if (!outputs || outputs.length === 0) {
-    return '';
-  }
-
-  const lines: string[] = [];
-  const texts = extractTextResponses(outputs);
-  const toolCalls = extractToolCalls(outputs);
-
-  // Request
-  lines.push('**Request:**');
-  lines.push(`> ${request}`);
-  lines.push('');
-
-  // Response
-  if (texts.length > 0) {
-    lines.push('**Response:**');
-    for (const text of texts) {
-      lines.push(`> ${text.replace(/\n/g, '\n> ')}`);
-    }
-    lines.push('');
-  }
-
-  // Tool Calls
-  if (toolCalls.length > 0) {
-    lines.push('**Tool Calls:**');
-    lines.push('');
-    lines.push('| Tool | Status | Input |');
-    lines.push('|------|--------|-------|');
-    for (const tc of toolCalls) {
-      const statusIcon = tc.status === 'completed' ? '✓' : '✗';
-      const inputStr = Object.entries(tc.input)
-        .map(([k, v]) => `${k}: \`${escapeMarkdownTableCell(String(v))}\``)
-        .join('<br>');
-      const errorStr = tc.error ? `<br>**Error:** ${escapeMarkdownTableCell(tc.error)}` : '';
-      lines.push(`| ${escapeMarkdownTableCell(tc.tool)} | ${statusIcon} ${tc.status} | ${inputStr}${errorStr} |`);
-    }
-    lines.push('');
-  }
-
-  // Raw Output (collapsible)
-  lines.push('<details>');
-  lines.push('<summary>Raw Output</summary>');
-  lines.push('');
-  lines.push('```json');
-  lines.push(JSON.stringify(outputs, null, 2));
-  lines.push('```');
-  lines.push('</details>');
-  lines.push('');
-
-  return lines.join('\n');
-}
+import type { TestResult, ScenarioResult, StepResult } from '../../types/index.js';
 
 export function formatAsMarkdown(result: TestResult): string {
   const lines: string[] = [];
@@ -134,13 +50,14 @@ function formatScenario(scenario: ScenarioResult): string {
   lines.push(`**Environment:** ${scenario.environment}`);
   lines.push(`**Duration:** ${scenario.duration_ms}ms`);
 
+  // 多运行时显示汇总统计
+  if (scenario.runs !== undefined) {
+    lines.push(`**Runs:** ${scenario.passed_runs}/${scenario.runs} passed (min_pass: ${scenario.min_pass})`);
+  }
+
   if (scenario.error) {
     lines.push('');
     lines.push(`**Error:** ${scenario.error}`);
-  }
-
-  if (scenario.tempDirectory) {
-    lines.push(`**Temp Directory:** ${scenario.tempDirectory}`);
   }
 
   lines.push('');
@@ -170,24 +87,8 @@ function formatStep(step: StepResult, index: number): string {
   lines.push(`${index}. **Input:** "${step.input}"`);
   lines.push(`   - Status: ${statusIcon} ${step.status}`);
   lines.push(`   - Duration: ${step.duration_ms}ms`);
-
-  if (step.assertions.length > 0) {
-    lines.push('   - Assertions:');
-    for (const assertion of step.assertions) {
-      const icon = assertion.passed ? '✓' : '✗';
-      lines.push(`     - ${icon} ${assertion.type}: ${assertion.value}`);
-      if (!assertion.passed && assertion.message) {
-        lines.push(`       - ${assertion.message}`);
-      }
-    }
-  }
-
-  // Session Output
-  if (step.actual_output && step.actual_output.length > 0) {
-    lines.push('');
-    lines.push(formatSessionOutputMarkdown(step.actual_output, step.input));
-  }
-
+  // 移除详细断言列表
+  // 移除 session output
   lines.push('');
 
   return lines.join('\n');
