@@ -361,7 +361,7 @@ agentvcr suggest <testFile> [-s sessionId] [--latest] [-o file] [--skill name] [
 运行测试用例。
 
 ```bash
-agentvcr run <testFile> [-f format] [-o file] [-s scenario] [--verbose]
+agentvcr run <testFile> [-f format] [-o file] [-s scenario]
 ```
 
 **选项**：
@@ -371,7 +371,6 @@ agentvcr run <testFile> [-f format] [-o file] [-s scenario] [--verbose]
 - `--parallel` - 并行运行场景
 - `-m, --model <model>` - 覆盖模型配置
 - `-a, --agent <agent>` - 覆盖 agent 配置
-- `--verbose` - 显示详细输出
 
 ### agentvcr report
 
@@ -420,25 +419,55 @@ Summary: 2 passed, 0 failed (total 21s)
 
 ## 输出格式
 
-- `json` - 结构化 JSON（默认）
-- `markdown` - 人类可读的 Markdown
-- `html` - 带样式的 HTML 报告
-- `jest` - Jest 兼容格式，便于 CI 集成
+Agent VCR 提供四种输出格式，各有不同的默认详细程度：
 
-### 会话内容展示
+| 格式 | 详细程度 | 说明 |
+|------|---------|------|
+| `json` | 详尽 | 完整结构化数据，包含所有运行详情 |
+| `html` | 详尽 | 可视化报告，步骤统计表格 + 可折叠 Tab 运行详情 |
+| `markdown` | 简洁 | 仅展示基本结果和汇总统计 |
+| `jest` | 简洁 | Jest 兼容格式，便于 CI 集成 |
 
-使用 `--verbose` 参数时，markdown 和 html 格式的测试报告会包含完整的会话内容：
+### JSON 输出结构
 
-- **Request**: 用户的输入请求
-- **Response**: Agent 的文本响应
-- **Tool Calls**: 工具调用列表（工具名、状态、输入参数）
-- **Raw Output**: 原始 JSON 输出（折叠显示）
+JSON 输出始终包含完整数据：
+- `scenarios[].runDetails` - 每次运行的完整对话过程和断言详情
+- `scenarios[].steps[].assertionStats` - 步骤级断言统计（通过次数、通过率）
+
+### HTML 报告特性
+
+HTML 输出提供丰富的可视化：
+- **步骤统计表格** - 展示每个断言的通过次数和通过率
+- **运行详情折叠块** - Tab 切换查看各次运行的完整对话过程
+- **颜色编码** - 通过率 ≥80% 绿色，50-79% 黄色，<50% 红色
 
 示例：
 
 ```bash
-agentvcr run ./tests/ --verbose -f markdown -o report.md
-agentvcr run ./tests/ --verbose -f html -o report.html
+# 生成 HTML 报告
+agentvcr run ./tests/ -f html -o report.html
+
+# 生成 Markdown 简要报告
+agentvcr run ./tests/ -f markdown -o report.md
+
+# 生成 Jest 格式用于 CI
+agentvcr run ./tests/ -f jest -o results.json
+```
+
+### Markdown 输出示例
+
+```markdown
+### probabilistic-test
+
+**Status:** ✅ PASSED
+**Runs:** 4/5 passed (min_pass: 4)
+**Duration:** 5000ms
+
+#### Steps
+
+1. **Input:** "创建文件"
+   - Status: ✓ passed
+   - Duration: 4800ms
 ```
 
 ## CI/CD 集成
