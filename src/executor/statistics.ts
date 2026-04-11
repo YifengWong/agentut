@@ -12,21 +12,21 @@ import type {
 } from '../types/index.js';
 
 /**
- * 用于统计的运行执行结果（简化版）
+ * 从 RunExecution 中提取所有断言结果（按步骤顺序）
  */
-export interface RunExecutionWithAssertions {
-  run_index: number;
-  status: 'passed' | 'failed';
-  duration_ms: number;
-  assertions: AssertionResult[];
-  error?: string;
+function extractAssertionsFromRun(run: RunExecution): AssertionResult[] {
+  if (run.steps) {
+    return run.steps.flatMap(s => s.assertions);
+  }
+  // 向后兼容：如果没有 steps，尝试 assertions 字段
+  return run.assertions || [];
 }
 
 /**
  * 计算步骤汇总信息
  */
 export function calculateStepSummary(
-  runs: RunExecutionWithAssertions[],
+  runs: RunExecution[],
   minPass: number
 ): StepSummary {
   const totalRuns = runs.length;
@@ -101,7 +101,7 @@ function getAssertionMinPass(assertion: Assertion, defaultMinPass: number): numb
  * 计算各断言的汇总统计
  */
 export function calculateAssertionSummaries(
-  runs: RunExecutionWithAssertions[],
+  runs: RunExecution[],
   assertions: Assertion[],
   defaultMinPass: number
 ): AssertionSummary[] {
@@ -122,8 +122,10 @@ export function calculateAssertionSummaries(
     const failures: AssertionFailure[] = [];
 
     for (const run of runs) {
-      // 找到对应的断言结果（按索引匹配）
-      const assertionResult = run.assertions[i];
+      // 收集所有步骤的断言结果
+      const allAssertions = extractAssertionsFromRun(run);
+      // 按索引匹配（假设各次运行的断言顺序一致）
+      const assertionResult = allAssertions[i];
 
       if (assertionResult && assertionResult.passed) {
         passedRuns++;
@@ -201,7 +203,7 @@ export function calculateAssertionStats(
 
     for (const run of runs) {
       // 收集所有步骤的断言结果
-      const allAssertions = run.steps ? run.steps.flatMap(s => s.assertions) : [];
+      const allAssertions = extractAssertionsFromRun(run);
       // 按索引匹配（假设各次运行的断言顺序一致）
       const assertionResult = allAssertions[i];
 

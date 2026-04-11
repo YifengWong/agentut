@@ -10,7 +10,7 @@ import {
   calculateStepSummary,
   calculateAssertionSummaries,
   determineScenarioStatus,
-  type RunExecutionWithAssertions
+  calculateAssertionStats
 } from '../executor/statistics.js';
 import {
   type YamlTestSuite,
@@ -18,6 +18,8 @@ import {
   type ScenarioResult,
   type StepResult,
   type RunExecution,
+  type RunStepDetail,
+  type AssertionStat,
   ExecutionError
 } from '../types/index.js';
 
@@ -190,8 +192,7 @@ async function executeScenario(
   }
 
   // 收集所有运行的执行结果
-  const allRunExecutions: RunExecutionWithAssertions[] = [];
-  const stepResults: StepResult[] = [];
+  const allRunExecutions: RunExecution[] = [];
   let lastError: string | undefined;
   let preservedTempDirectory: string | undefined; // 用于保存不清理的临时目录
 
@@ -212,8 +213,7 @@ async function executeScenario(
 
       // Execute steps
       const totalSteps = scenario.steps.length;
-      const runAssertions: RunExecution['assertions'] = [];
-      const runStepResults: StepResult[] = [];
+      const runStepDetails: RunStepDetail[] = [];
 
       for (let stepIndex = 0; stepIndex < scenario.steps.length; stepIndex++) {
         const step = scenario.steps[stepIndex];
@@ -248,7 +248,8 @@ async function executeScenario(
           const stepPassed = assertionResults.every(a => a.passed);
           const stepDuration = Date.now() - stepStartTime;
 
-          const stepResult: StepResult = {
+          const stepDetail: RunStepDetail = {
+            step_index: stepIndex,
             input: step.input,
             status: stepPassed ? 'passed' : 'failed',
             duration_ms: stepDuration,
@@ -256,8 +257,7 @@ async function executeScenario(
             actual_output: runResult.outputs
           };
 
-          runStepResults.push(stepResult);
-          runAssertions.push(...assertionResults);
+          runStepDetails.push(stepDetail);
 
           // Log step end (只在第一次运行时)
           if (runIndex === 0) {
@@ -267,25 +267,23 @@ async function executeScenario(
           const stepDuration = Date.now() - stepStartTime;
           const errorMessage = err instanceof Error ? err.message : 'Unknown error';
 
-          const stepResult: StepResult = {
+          const assertionResult = {
+            type: 'error',
+            value: errorMessage,
+            passed: false,
+            message: errorMessage
+          };
+
+          const stepDetail: RunStepDetail = {
+            step_index: stepIndex,
             input: step.input,
             status: 'failed',
             duration_ms: stepDuration,
-            assertions: [],
+            assertions: [assertionResult],
             actual_output: undefined
           };
 
-          if (err instanceof Error) {
-            stepResult.assertions = [{
-              type: 'error',
-              value: err.message,
-              passed: false,
-              message: err.message
-            }];
-            runAssertions.push(stepResult.assertions[0]);
-          }
-
-          runStepResults.push(stepResult);
+          runStepDetails.push(stepDetail);
           runError = errorMessage;
 
           if (runIndex === 0) {
@@ -296,20 +294,15 @@ async function executeScenario(
       }
 
       // 收集单次运行结果
-      const allStepsPassed = runStepResults.every(s => s.status === 'passed');
-      const runExecution: RunExecutionWithAssertions = {
+      const allStepsPassed = runStepDetails.every(s => s.status === 'passed');
+      const runExecution: RunExecution = {
         run_index: runIndex,
         status: allStepsPassed && !runError ? 'passed' : 'failed',
         duration_ms: Date.now() - startTime,
-        assertions: runAssertions,
+        steps: runStepDetails,
         error: runError
       };
       allRunExecutions.push(runExecution);
-
-      // 在第一次运行时收集 step results（用于展示）
-      if (runIndex === 0) {
-        stepResults.push(...runStepResults);
-      }
 
       // Cleanup for this run
       if (tempDirectory) {
@@ -332,7 +325,7 @@ async function executeScenario(
         run_index: runIndex,
         status: 'failed',
         duration_ms: 0,
-        assertions: [],
+        steps: [],
         error: runError
       });
     }
@@ -340,26 +333,58 @@ async function executeScenario(
 
   // 计算汇总信息
   let finalStatus: 'passed' | 'failed';
+  const allAssertions = scenario.steps.flatMap(step => step.expected);
 
+  // 计算断言统计
+  const assertionStats = effectiveRuns > 1
+    ? calculateAssertionStats(allRunExecutions, allAssertions, effectiveMinPass)
+    : undefined;
+
+  // 构建步骤结果（从运行详情中提取）
+  const stepResults: StepResult[] = scenario.steps.map((stepConfig, stepIndex) => {
+    // 从第一次成功运行中获取步骤详情，或使用最后一次运行
+    const firstRun = allRunExecutions[0];
+    const stepDetail = firstRun?.steps?.[stepIndex];
+
+    // 计算该步骤平均耗时
+    const avgDuration = allRunExecutions.length > 0
+      ? Math.round(allRunExecutions.reduce((sum, r) =>
+          sum + (r.steps?.[stepIndex]?.duration_ms || 0), 0) / allRunExecutions.length)
+      : 0;
+
+    // 计算该步骤的断言统计（按步骤断言数量分割）
+    const assertionsPerStep = stepConfig.expected.length;
+    const startIdx = scenario.steps.slice(0, stepIndex).reduce((sum, s) => sum + s.expected.length, 0);
+    const stepAssertionStats = assertionStats?.slice(startIdx, startIdx + assertionsPerStep);
+
+    return {
+      input: stepConfig.input,
+      status: determineStepStatus(allRunExecutions, stepIndex),
+      duration_ms: avgDuration,
+      assertions: stepDetail?.assertions || [],
+      actual_output: stepDetail?.actual_output,
+      assertionStats: stepAssertionStats
+    };
+  });
+
+  // 判定最终状态
   if (effectiveRuns === 1) {
     // 单次运行：传统判定逻辑
     const allStepsPassed = stepResults.every(s => s.status === 'passed');
     finalStatus = allStepsPassed && !lastError ? 'passed' : 'failed';
   } else {
     // 多次运行：使用统计模块判定
-    // 注意：对于多步场景，我们需要合并所有步骤的断言
-    const allAssertions = scenario.steps.flatMap(step => step.expected);
     const stepSummary = calculateStepSummary(allRunExecutions, effectiveMinPass);
     const assertionSummaries = calculateAssertionSummaries(allRunExecutions, allAssertions, effectiveMinPass);
     finalStatus = determineScenarioStatus(stepSummary, assertionSummaries);
 
-    // 添加 runs 信息到第一个 step result
+    // 添加 runs 信息到第一个 step result（向后兼容）
     if (stepResults.length > 0) {
       stepResults[0].runs = allRunExecutions.map(r => ({
         run_index: r.run_index,
         status: r.status,
         duration_ms: r.duration_ms,
-        assertions: r.assertions,
+        assertions: r.steps?.flatMap(s => s.assertions) || [],
         error: r.error
       }));
       stepResults[0].summary = stepSummary;
@@ -380,6 +405,15 @@ async function executeScenario(
     // 概率测试扩展字段：只有在显式配置多运行时才返回这些字段
     runs: !isTraditionalSingleRun ? effectiveRuns : undefined,
     min_pass: !isTraditionalSingleRun ? effectiveMinPass : undefined,
-    passed_runs: !isTraditionalSingleRun ? passedRuns : undefined
+    passed_runs: !isTraditionalSingleRun ? passedRuns : undefined,
+    runDetails: allRunExecutions
   };
+}
+
+/**
+ * 判定单个步骤的状态
+ */
+function determineStepStatus(runs: RunExecution[], stepIndex: number): 'passed' | 'failed' {
+  const passedCount = runs.filter(r => r.steps?.[stepIndex]?.status === 'passed').length;
+  return passedCount >= Math.ceil(runs.length / 2) ? 'passed' : 'failed';
 }
