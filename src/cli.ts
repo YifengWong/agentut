@@ -12,8 +12,8 @@ import { formatAsJest } from './output/formatters/jest.js';
 const program = new Command();
 
 program
-  .name('agentvcr')
-  .description('Agent VCR - Test framework for opencode Agent behaviors')
+  .name('agentut')
+  .description('Agent UT - Test framework for Agent behaviors')
   .version('1.0.0');
 
 // init command

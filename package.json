@@ -1,11 +1,11 @@
 {
-  "name": "agentvcr",
+  "name": "agentut",
   "version": "1.0.0",
-  "description": "Agent VCR - Test framework for opencode Agent behaviors",
+  "description": "Agent UT - Test framework for Agent behaviors",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "agentvcr": "./dist/cli.js"
+    "agentut": "./dist/cli.js"
   },
   "scripts": {
     "build": "tsc",

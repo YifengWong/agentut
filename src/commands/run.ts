@@ -64,7 +64,7 @@ export async function runTests(
 
   // Execute scenarios
   const scenarioResults: ScenarioResult[] = [];
-  const tempRoot = path.resolve(yamlDirectory, '.agentvcr', 'temp');
+  const tempRoot = path.resolve(yamlDirectory, '.agentut', 'temp');
   const suiteStartTime = Date.now();
 
   for (let i = 0; i < scenarios.length; i++) {
