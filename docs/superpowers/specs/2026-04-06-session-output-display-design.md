@@ -216,8 +216,8 @@ npm test -- tests/output/formatters/session-output.test.ts
 
 使用现有 example 测试验证：
 ```bash
-agentvcr run ./example/tests/file-operations.yaml --verbose -f markdown -o report.md
-agentvcr run ./example/tests/file-operations.yaml --verbose -f html -o report.html
+agentut run ./example/tests/file-operations.yaml --verbose -f markdown -o report.md
+agentut run ./example/tests/file-operations.yaml --verbose -f html -o report.html
 ```
 
 预期结果：

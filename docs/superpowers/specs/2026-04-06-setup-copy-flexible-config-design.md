@@ -55,7 +55,7 @@ config:
 `$WORKDIR` 表示测试执行时的临时工作目录（动态生成）。
 
 执行时替换逻辑：
-- 临时工作目录格式：`.agentvcr/temp/{scenario-name}-{uuid}-{timestamp}/`
+- 临时工作目录格式：`.agentut/temp/{scenario-name}-{uuid}-{timestamp}/`
 - `$WORKDIR` 替换为实际临时目录绝对路径
 
 ### 类型定义变更

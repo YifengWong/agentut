@@ -370,10 +370,10 @@ interface AssertionResult {
 
 ## CLI 命令调整
 
-### agentvcr run 新增参数
+### agentut run 新增参数
 
 ```bash
-agentvcr run <test-file> [options]
+agentut run <test-file> [options]
 
 新增选项:
   --runs <n>              覆盖全局 runs 配置
@@ -385,16 +385,16 @@ agentvcr run <test-file> [options]
 
 ```bash
 # 使用 YAML 配置的 runs/min_pass
-agentvcr run ./tests/my-test.yaml
+agentut run ./tests/my-test.yaml
 
 # CLI 覆盖配置（临时调整，用于快速验证）
-agentvcr run ./tests/my-test.yaml --runs 3 --min-pass 2
+agentut run ./tests/my-test.yaml --runs 3 --min-pass 2
 
 # 快速单次测试（用于开发调试）
-agentvcr run ./tests/my-test.yaml --quick
+agentut run ./tests/my-test.yaml --quick
 
 # 并行执行多个场景（每个场景独立多次运行）
-agentvcr run ./tests/ --parallel
+agentut run ./tests/ --parallel
 ```
 
 ## 执行流程调整
@@ -458,7 +458,7 @@ agentvcr run ./tests/ --parallel
 {tempRoot}/{scenarioId}-{runIndex}-{timestamp}
 ```
 
-示例: `.agentvcr/temp/create-file-run1-20260408103000/`
+示例: `.agentut/temp/create-file-run1-20260408103000/`
 
 ## 向后兼容
 

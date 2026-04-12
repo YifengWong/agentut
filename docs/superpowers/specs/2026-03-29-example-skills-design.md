@@ -88,7 +88,7 @@ description: 简单的文件操作 Skill，用于演示创建和读取文件的�
 完成实现后，运行：
 
 ```bash
-agentvcr run ./example/tests/file-operations.yaml
+agentut run ./example/tests/file-operations.yaml
 ```
 
 预期结果：所有场景 passed。

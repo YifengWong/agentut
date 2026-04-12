@@ -22,7 +22,7 @@ Agent VCR 是一个为 opencode Agent 工程提供单元测试能力的 TypeScri
 ### 目录结构
 
 ```
-agentvcr/
+agentut/
 ├── src/
 │   ├── cli.ts                    # CLI 入口，命令分发
 │   ├── commands/
@@ -185,12 +185,12 @@ expected:
 
 ## CLI 命令设计
 
-### agentvcr run
+### agentut run
 
 运行测试用例。
 
 ```bash
-agentvcr run <test-file-or-directory> [options]
+agentut run <test-file-or-directory> [options]
 
 Options:
   --format <json|markdown|html|jest>   输出格式，默认 json
@@ -216,12 +216,12 @@ Options:
    - 执行 cleanup 清理
 5. 输出测试结果（JSON 或其他格式）
 
-### agentvcr suggest
+### agentut suggest
 
 智能推荐生成测试用例。
 
 ```bash
-agentvcr suggest <session-id> [options]
+agentut suggest <session-id> [options]
 
 Options:
   --latest                             使用最近的会话
@@ -241,12 +241,12 @@ Options:
 3. 生成 YAML 测试用例结构
 4. 输出到文件或标准输出
 
-### agentvcr report
+### agentut report
 
 生成测试报告。
 
 ```bash
-agentvcr report [options]
+agentut report [options]
 
 Options:
   --input <json-file>                  JSON 结果文件路径
@@ -254,12 +254,12 @@ Options:
   --output <file-or-directory>         输出路径
 ```
 
-### agentvcr init
+### agentut init
 
 初始化测试目录结构。
 
 ```bash
-agentvcr init [directory] [options]
+agentut init [directory] [options]
 
 Options:
   --with-example                       创建示例测试用例
@@ -274,12 +274,12 @@ Options:
 │       └── sample.txt
 ├── tests/
 │   └── example-test.yaml
-└── agentvcr.config.yaml               # 可选配置文件
+└── agentut.config.yaml               # 可选配置文件
 ```
 
 ## opencode CLI 接口规范
 
-本节定义 agentvcr 对 opencode CLI 的使用规范，确保实现时有明确的接口契约。
+本节定义 agentut 对 opencode CLI 的使用规范，确保实现时有明确的接口契约。
 
 ### opencode run 命令
 
@@ -756,12 +756,12 @@ class SetupError extends Error {
 
 | 组成部分 | 说明 |
 |----------|------|
-| `tempRoot` | 系统临时目录或配置的临时目录（如 `./.agentvcr/temp/`） |
+| `tempRoot` | 系统临时目录或配置的临时目录（如 `./.agentut/temp/`） |
 | `scenarioId` | 场景名称（清理非法字符） |
 | `runId` | 本次运行唯一 ID（UUID 短格式） |
 | `timestamp` | 执行时间戳（确保唯一性） |
 
-**示例**：`./.agentvcr/temp/basic-debugging-flow-a1b2c3-20260329103000/`
+**示例**：`./.agentut/temp/basic-debugging-flow-a1b2c3-20260329103000/`
 
 ### 并行执行资源隔离
 
