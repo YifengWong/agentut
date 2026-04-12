@@ -1,16 +1,16 @@
 ---
-name: agent-vcr
+name: agent-ut
 description: Test framework for opencode Agent behaviors. Use when you need to test skills, agents, or other agent modules through recorded input sequences and assertion verification.
 ---
 
-# Agent VCR
+# Agent UT
 
 A test framework for opencode Agent behaviors. Record user inputs, replay them, and verify expected behaviors.
 
 ## Installation
 
 ```bash
-npm install -g agentvcr
+npm install -g agentut
 ```
 
 ## Quick Start
@@ -18,7 +18,7 @@ npm install -g agentvcr
 ### 1. Initialize a Test Directory
 
 ```bash
-agentvcr init ./tests --with-example
+agentut init ./tests --with-example
 ```
 
 This creates:
@@ -28,13 +28,13 @@ This creates:
 ### 2. Run Tests
 
 ```bash
-agentvcr run ./tests/example-test.yaml
+agentut run ./tests/example-test.yaml
 ```
 
 ### 3. Generate Test from Session
 
 ```bash
-agentvcr suggest --latest -o ./tests/my-test.yaml
+agentut suggest --latest -o ./tests/my-test.yaml
 ```
 
 ## Test Case Format
@@ -78,36 +78,36 @@ config:
 
 ## Commands
 
-### agentvcr init
+### agentut init
 
 Initialize test directory structure.
 
 ```bash
-agentvcr init [directory] [--with-example]
+agentut init [directory] [--with-example]
 ```
 
-### agentvcr suggest
+### agentut suggest
 
 Generate test case from opencode session.
 
 ```bash
-agentvcr suggest [sessionId] [--latest] [-o file] [--skill name] [--name name]
+agentut suggest [sessionId] [--latest] [-o file] [--skill name] [--name name]
 ```
 
-### agentvcr run
+### agentut run
 
 Run test cases.
 
 ```bash
-agentvcr run <testFile> [-f format] [-o file] [-s scenario] [--verbose]
+agentut run <testFile> [-f format] [-o file] [-s scenario] [--verbose]
 ```
 
-### agentvcr report
+### agentut report
 
 Generate formatted report.
 
 ```bash
-agentvcr report -i <jsonFile> -f <format> [-o file]
+agentut report -i <jsonFile> -f <format> [-o file]
 ```
 
 ## Output Formats
@@ -122,7 +122,7 @@ agentvcr report -i <jsonFile> -f <format> [-o file]
 For CI/CD pipelines, use JSON or Jest format:
 
 ```bash
-agentvcr run ./tests/ -f jest -o results.json
+agentut run ./tests/ -f jest -o results.json
 ```
 
 Exit code is 0 if all tests pass, 1 if any fail.
