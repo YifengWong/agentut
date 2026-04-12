@@ -1,6 +1,6 @@
-# Agent VCR
+# Agent UT
 
-Agent VCR 是一个为 opencode Agent 工程提供单元测试能力的 TypeScript CLI 工具。通过记录用户输入序列和关键检查点，每次完整重放测试，验证 Agent 行为是否符合预期。
+Agent UT 是一个为 opencode Agent 工程提供单元测试能力的 TypeScript CLI 工具。通过记录用户输入序列和关键检查点，每次完整重放测试，验证 Agent 行为是否符合预期。
 
 ## 核心理念
 
@@ -9,7 +9,7 @@ Agent VCR 是一个为 opencode Agent 工程提供单元测试能力的 TypeScri
 ## 安装
 
 ```bash
-npm install -g agentvcr
+npm install -g agentut
 ```
 
 ## 快速开始
@@ -17,7 +17,7 @@ npm install -g agentvcr
 ### 1. 初始化测试目录
 
 ```bash
-agentvcr init ./tests --with-example
+agentut init ./tests --with-example
 ```
 
 这会创建：
@@ -27,17 +27,17 @@ agentvcr init ./tests --with-example
 ### 2. 运行测试
 
 ```bash
-agentvcr run ./tests/example-test.yaml
+agentut run ./tests/example-test.yaml
 ```
 
 ### 3. 从 Session 生成测试
 
 ```bash
 # 从最近的 opencode session 生成测试用例
-agentvcr suggest --latest -o ./tests/my-test.yaml
+agentut suggest --latest -o ./tests/my-test.yaml
 
 # 从指定 session 生成
-agentvcr suggest ses_xxx -o ./tests/my-test.yaml
+agentut suggest ses_xxx -o ./tests/my-test.yaml
 ```
 
 ## 示例
@@ -46,7 +46,7 @@ agentvcr suggest ses_xxx -o ./tests/my-test.yaml
 
 ```bash
 # 运行示例测试
-agentvcr run ./example/tests/file-operations.yaml
+agentut run ./example/tests/file-operations.yaml
 ```
 
 示例覆盖：
@@ -237,7 +237,7 @@ Matcher 模式的断言结果会包含实际值，便于调试：
 
 ## 概率性测试
 
-在 AI 时代，测试结果可能存在不确定性。Agent VCR 支持概率性测试，允许配置多次运行和通过阈值。
+在 AI 时代，测试结果可能存在不确定性。Agent UT 支持概率性测试，允许配置多次运行和通过阈值。
 
 ### 配置
 
@@ -269,10 +269,10 @@ scenarios:
 
 ```bash
 # 快速单次测试（用于调试）
-agentvcr run ./tests/my-test.yaml --quick
+agentut run ./tests/my-test.yaml --quick
 
 # 临时调整运行次数
-agentvcr run ./tests/my-test.yaml --runs 3 --min-pass 2
+agentut run ./tests/my-test.yaml --runs 3 --min-pass 2
 ```
 
 ### 判定规则
@@ -283,7 +283,7 @@ agentvcr run ./tests/my-test.yaml --runs 3 --min-pass 2
 
 ## Agent CLI 配置
 
-Agent VCR 支持配置自定义 CLI 命令名，适用于企业环境封装场景。在 YAML 测试文件的 `config.agent_cli` 中配置：
+Agent UT 支持配置自定义 CLI 命令名，适用于企业环境封装场景。在 YAML 测试文件的 `config.agent_cli` 中配置：
 
 ```yaml
 name: my-test-suite
@@ -317,8 +317,8 @@ config:
 EOF
 
 # 使用配置文件生成测试
-agentvcr suggest config.yaml --latest -o tests/my-test.yaml
-agentvcr suggest config.yaml -s ses_xxx -o tests/my-test.yaml
+agentut suggest config.yaml --latest -o tests/my-test.yaml
+agentut suggest config.yaml -s ses_xxx -o tests/my-test.yaml
 ```
 
 ### 未来扩展
@@ -330,20 +330,20 @@ agentvcr suggest config.yaml -s ses_xxx -o tests/my-test.yaml
 
 ## CLI 命令
 
-### agentvcr init
+### agentut init
 
 初始化测试目录结构。
 
 ```bash
-agentvcr init [directory] [--with-example]
+agentut init [directory] [--with-example]
 ```
 
-### agentvcr suggest
+### agentut suggest
 
 从 opencode session 生成测试用例（需要 YAML 配置文件）。
 
 ```bash
-agentvcr suggest <testFile> [-s sessionId] [--latest] [-o file] [--skill name] [--name name]
+agentut suggest <testFile> [-s sessionId] [--latest] [-o file] [--skill name] [--name name]
 ```
 
 **参数**：
@@ -356,12 +356,12 @@ agentvcr suggest <testFile> [-s sessionId] [--latest] [-o file] [--skill name] [
 - `--skill <name>` — 目标 Skill 名称
 - `--name <name>` — 测试套件名称
 
-### agentvcr run
+### agentut run
 
 运行测试用例。
 
 ```bash
-agentvcr run <testFile> [-f format] [-o file] [-s scenario]
+agentut run <testFile> [-f format] [-o file] [-s scenario]
 ```
 
 **选项**：
@@ -372,12 +372,12 @@ agentvcr run <testFile> [-f format] [-o file] [-s scenario]
 - `-m, --model <model>` - 覆盖模型配置
 - `-a, --agent <agent>` - 覆盖 agent 配置
 
-### agentvcr report
+### agentut report
 
 生成格式化报告。
 
 ```bash
-agentvcr report -i <jsonFile> -f <format> [-o file]
+agentut report -i <jsonFile> -f <format> [-o file]
 ```
 
 ### 实时日志输出
@@ -419,7 +419,7 @@ Summary: 2 passed, 0 failed (total 21s)
 
 ## 输出格式
 
-Agent VCR 提供四种输出格式，各有不同的默认详细程度：
+Agent UT 提供四种输出格式，各有不同的默认详细程度：
 
 | 格式 | 详细程度 | 说明 |
 |------|---------|------|
@@ -445,13 +445,13 @@ HTML 输出提供丰富的可视化：
 
 ```bash
 # 生成 HTML 报告
-agentvcr run ./tests/ -f html -o report.html
+agentut run ./tests/ -f html -o report.html
 
 # 生成 Markdown 简要报告
-agentvcr run ./tests/ -f markdown -o report.md
+agentut run ./tests/ -f markdown -o report.md
 
 # 生成 Jest 格式用于 CI
-agentvcr run ./tests/ -f jest -o results.json
+agentut run ./tests/ -f jest -o results.json
 ```
 
 ### Markdown 输出示例
@@ -474,7 +474,7 @@ agentvcr run ./tests/ -f jest -o results.json
 
 ```bash
 # 运行测试并输出 Jest 格式
-agentvcr run ./tests/ -f jest -o results.json
+agentut run ./tests/ -f jest -o results.json
 
 # 退出码：0 表示全部通过，1 表示有失败
 ```
@@ -493,7 +493,7 @@ npm run build
 
 # 本地链接测试
 npm link
-agentvcr --help
+agentut --help
 ```
 
 ## 许可证
