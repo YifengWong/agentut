@@ -13,7 +13,7 @@
 ## File Structure
 
 ```
-agentvcr/
+agentut/
 ├── src/
 │   ├── types/
 │   │   └── index.ts              # All type definitions
@@ -137,7 +137,7 @@ node_modules/
 dist/
 *.log
 .env
-.agentvcr/
+.agentut/
 coverage/
 ```
 
@@ -4214,7 +4214,7 @@ export async function runTests(
 
   // Execute scenarios
   const scenarioResults: ScenarioResult[] = [];
-  const tempRoot = path.join(yamlDirectory, '.agentvcr', 'temp');
+  const tempRoot = path.join(yamlDirectory, '.agentut', 'temp');
 
   for (const scenario of scenarios) {
     const result = await executeScenario(suite, scenario, yamlDirectory, tempRoot, {
@@ -4576,7 +4576,7 @@ import { formatAsJest } from './output/formatters/jest.js';
 const program = new Command();
 
 program
-  .name('agentvcr')
+  .name('agentut')
   .description('Agent VCR - Test framework for opencode Agent behaviors')
   .version('1.0.0');
 
@@ -4718,7 +4718,7 @@ program.parse();
 ```json
 {
   "bin": {
-    "agentvcr": "./dist/cli.js"
+    "agentut": "./dist/cli.js"
   }
 }
 ```
@@ -4763,7 +4763,7 @@ A test framework for opencode Agent behaviors. Record user inputs, replay them, 
 ## Installation
 
 ```bash
-npm install -g agentvcr
+npm install -g agentut
 ```
 
 ## Quick Start
@@ -4771,7 +4771,7 @@ npm install -g agentvcr
 ### 1. Initialize a Test Directory
 
 ```bash
-agentvcr init ./tests --with-example
+agentut init ./tests --with-example
 ```
 
 This creates:
@@ -4781,13 +4781,13 @@ This creates:
 ### 2. Run Tests
 
 ```bash
-agentvcr run ./tests/example-test.yaml
+agentut run ./tests/example-test.yaml
 ```
 
 ### 3. Generate Test from Session
 
 ```bash
-agentvcr suggest --latest -o ./tests/my-test.yaml
+agentut suggest --latest -o ./tests/my-test.yaml
 ```
 
 ## Test Case Format
@@ -4831,36 +4831,36 @@ config:
 
 ## Commands
 
-### agentvcr init
+### agentut init
 
 Initialize test directory structure.
 
 ```bash
-agentvcr init [directory] [--with-example]
+agentut init [directory] [--with-example]
 ```
 
-### agentvcr suggest
+### agentut suggest
 
 Generate test case from opencode session.
 
 ```bash
-agentvcr suggest [sessionId] [--latest] [-o file] [--skill name] [--name name]
+agentut suggest [sessionId] [--latest] [-o file] [--skill name] [--name name]
 ```
 
-### agentvcr run
+### agentut run
 
 Run test cases.
 
 ```bash
-agentvcr run <testFile> [-f format] [-o file] [-s scenario] [--verbose]
+agentut run <testFile> [-f format] [-o file] [-s scenario] [--verbose]
 ```
 
-### agentvcr report
+### agentut report
 
 Generate formatted report.
 
 ```bash
-agentvcr report -i <jsonFile> -f <format> [-o file]
+agentut report -i <jsonFile> -f <format> [-o file]
 ```
 
 ## Output Formats
@@ -4875,7 +4875,7 @@ agentvcr report -i <jsonFile> -f <format> [-o file]
 For CI/CD pipelines, use JSON or Jest format:
 
 ```bash
-agentvcr run ./tests/ -f jest -o results.json
+agentut run ./tests/ -f jest -o results.json
 ```
 
 Exit code is 0 if all tests pass, 1 if any fail.
@@ -4915,14 +4915,14 @@ Expected: No errors
 npm link
 
 # Test init
-agentvcr init ./test-output --with-example
+agentut init ./test-output --with-example
 
 # Verify files created
 ls ./test-output
 
 # Cleanup
 rm -rf ./test-output
-npm unlink -g agentvcr
+npm unlink -g agentut
 ```
 
 - [ ] **Step 4: Final commit**

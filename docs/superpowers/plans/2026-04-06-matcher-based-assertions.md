@@ -1323,7 +1323,7 @@ git commit -m "docs: add comprehensive Matcher pattern documentation"
 
 - [ ] **Step 1: 运行示例测试**
 
-Run: `agentvcr run ./example/tests/file-operations.yaml --verbose`
+Run: `agentut run ./example/tests/file-operations.yaml --verbose`
 Expected: 示例测试通过（向后兼容验证）
 
 - [ ] **Step 2: 创建 Matcher 示例测试文件**
@@ -1361,7 +1361,7 @@ config:
 
 - [ ] **Step 3: 运行 Matcher 示例测试**
 
-Run: `agentvcr run ./example/tests/matcher-example.yaml`
+Run: `agentut run ./example/tests/matcher-example.yaml`
 Expected: 测试运行成功
 
 - [ ] **Step 4: 最终提交**

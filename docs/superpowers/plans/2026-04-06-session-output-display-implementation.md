@@ -476,7 +476,7 @@ npm test
 - [ ] **Step 2: 运行集成测试（Markdown）**
 
 ```bash
-cd D:/Projects/agentvcr && node dist/cli.js run ./example/tests/file-operations.yaml --verbose -f markdown -o report.md
+cd D:/Projects/agentut && node dist/cli.js run ./example/tests/file-operations.yaml --verbose -f markdown -o report.md
 ```
 
 检查 `report.md` 是否包含：
@@ -488,7 +488,7 @@ cd D:/Projects/agentvcr && node dist/cli.js run ./example/tests/file-operations.
 - [ ] **Step 3: 运行集成测试（HTML）**
 
 ```bash
-cd D:/Projects/agentvcr && node dist/cli.js run ./example/tests/file-operations.yaml --verbose -f html -o report.html
+cd D:/Projects/agentut && node dist/cli.js run ./example/tests/file-operations.yaml --verbose -f html -o report.html
 ```
 
 在浏览器中打开 `report.html`，检查：
@@ -521,8 +521,8 @@ cd D:/Projects/agentvcr && node dist/cli.js run ./example/tests/file-operations.
 示例：
 
 \`\`\`bash
-agentvcr run ./tests/ --verbose -f markdown -o report.md
-agentvcr run ./tests/ --verbose -f html -o report.html
+agentut run ./tests/ --verbose -f markdown -o report.md
+agentut run ./tests/ --verbose -f html -o report.html
 \`\`\`
 ```
 

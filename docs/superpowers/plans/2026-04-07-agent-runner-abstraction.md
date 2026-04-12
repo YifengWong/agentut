@@ -1578,8 +1578,8 @@ config:
 EOF
 
 # 使用配置文件生成测试
-agentvcr suggest config.yaml --latest -o tests/my-test.yaml
-agentvcr suggest config.yaml -s ses_xxx -o tests/my-test.yaml
+agentut suggest config.yaml --latest -o tests/my-test.yaml
+agentut suggest config.yaml -s ses_xxx -o tests/my-test.yaml
 ```
 
 ### 未来扩展
@@ -1590,17 +1590,17 @@ agentvcr suggest config.yaml -s ses_xxx -o tests/my-test.yaml
 - `gemini` — 未来支持
 ```
 
-Insert after "## CLI 命令" section, before "### agentvcr init" subsection.
+Insert after "## CLI 命令" section, before "### agentut init" subsection.
 
 - [ ] **Step 2: Update suggest command section**
 
 ```markdown
-### agentvcr suggest
+### agentut suggest
 
 从 opencode session 生成测试用例（需要 YAML 配置文件）。
 
 ```bash
-agentvcr suggest <testFile> [-s sessionId] [--latest] [-o file] [--skill name] [--name name]
+agentut suggest <testFile> [-s sessionId] [--latest] [-o file] [--skill name] [--name name]
 ```
 
 **参数**：

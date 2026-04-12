@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 为 agentvcr 添加概率性测试通过率指标支持，允许配置多次运行和通过阈值。
+**Goal:** 为 agentut 添加概率性测试通过率指标支持，允许配置多次运行和通过阈值。
 
 **Architecture:** 扩展现有类型系统添加 runs/min_pass 配置；新增 statistics 模块处理多次运行统计；修改 run 命令实现循环执行逻辑；扩展输出格式支持新的结果结构。
 
@@ -1802,10 +1802,10 @@ scenarios:
 
 ```bash
 # 快速单次测试（用于调试）
-agentvcr run ./tests/my-test.yaml --quick
+agentut run ./tests/my-test.yaml --quick
 
 # 临时调整运行次数
-agentvcr run ./tests/my-test.yaml --runs 3 --min-pass 2
+agentut run ./tests/my-test.yaml --runs 3 --min-pass 2
 ```
 
 ### 判定规则

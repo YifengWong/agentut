@@ -905,7 +905,7 @@ export async function runTests(
 
   // Execute scenarios
   const scenarioResults: ScenarioResult[] = [];
-  const tempRoot = path.resolve(yamlDirectory, '.agentvcr', 'temp');
+  const tempRoot = path.resolve(yamlDirectory, '.agentut', 'temp');
 
   for (let i = 0; i < scenarios.length; i++) {
     const scenario = scenarios[i];
@@ -1372,7 +1372,7 @@ Summary: 2 passed, 0 failed (total xxx)
 在 README.md 的 CLI 命令部分，添加关于实时日志输出的说明：
 
 ```markdown
-### agentvcr run
+### agentut run
 
 运行测试用例时会实时输出执行进度：
 - 测试套件启动和场景进度

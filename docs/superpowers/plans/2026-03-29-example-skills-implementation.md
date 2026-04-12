@@ -206,7 +206,7 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
 
 ```bash
 # 运行示例测试
-agentvcr run ./example/tests/file-operations.yaml
+agentut run ./example/tests/file-operations.yaml
 ```
 
 示例覆盖：
@@ -256,9 +256,9 @@ cat example/skills/file-operations.md
 cat example/fixtures/templates/hello.txt
 cat example/tests/file-operations.yaml
 
-# 运行示例测试（如果 agentvcr 已构建）
+# 运行示例测试（如果 agentut 已构建）
 npm run build
-agentvcr run ./example/tests/file-operations.yaml --verbose
+agentut run ./example/tests/file-operations.yaml --verbose
 ```
 
 预期：目录结构正确，文件内容完整，测试运行正常。

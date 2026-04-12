@@ -1514,7 +1514,7 @@ git commit -m "test(jest): add test for multi-run scenario compatibility"
 
 - [ ] **Step 1: 移除 --verbose 参数说明**
 
-在 `README.md` 的 `agentvcr run` 命令部分，删除：
+在 `README.md` 的 `agentut run` 命令部分，删除：
 
 ```markdown
 - `--verbose` - 显示详细输出
@@ -1553,13 +1553,13 @@ HTML 输出提供丰富的可视化：
 
 ```bash
 # 生成 HTML 报告
-agentvcr run ./tests/ -f html -o report.html
+agentut run ./tests/ -f html -o report.html
 
 # 生成 Markdown 简要报告
-agentvcr run ./tests/ -f markdown -o report.md
+agentut run ./tests/ -f markdown -o report.md
 
 # 生成 Jest 格式用于 CI
-agentvcr run ./tests/ -f jest -o results.json
+agentut run ./tests/ -f jest -o results.json
 ```
 
 ### Markdown 输出示例
