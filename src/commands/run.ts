@@ -220,13 +220,16 @@ async function executeScenario(
         const stepStartTime = Date.now();
         const stepNumber = stepIndex + 1;
 
-        // Log step start (只在第一次运行时显示详细日志，避免重复)
+        // Log step start (只在第一次运行时显示步骤标题)
         if (runIndex === 0) {
           logger.startStep(scenario.name, step.input, stepNumber, totalSteps);
-          // 传统单次运行模式使用原始消息，多运行模式显示运行进度
-          const progressMsg = isTraditionalSingleRun ? 'executing...' : `executing run ${runIndex + 1}/${effectiveRuns}...`;
-          logger.showProgress(scenario.name, progressMsg);
         }
+
+        // 每次运行都显示进度（动态覆盖）
+        const progressMsg = isTraditionalSingleRun
+          ? 'executing...'
+          : `Step ${stepNumber}/${totalSteps}, Run ${runIndex + 1}/${effectiveRuns}...`;
+        logger.showProgress(scenario.name, progressMsg);
 
         try {
           // Run agent

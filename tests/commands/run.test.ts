@@ -764,5 +764,57 @@ describe('run command', () => {
       expect(result.scenarios[0].status).toBe('passed');
       expect(result.scenarios[0].runs).toBe(1);
     });
+
+    it('should showProgress for each run with step and run progress format', async () => {
+      const mockSuite: YamlTestSuite = {
+        name: 'test',
+        environments: {
+          default: { directory: './test', setup: [] }
+        },
+        scenarios: [{
+          name: 'multi-run-progress',
+          environment: 'default',
+          cleanup: true,
+          steps: [{
+            input: 'Create file',
+            expected: [{ should_call_tool: 'Write' }],
+            timeout: 60000
+          }]
+        }],
+        config: {
+          runs: 3,
+          min_pass: 2,
+          agent_cli: { runner: 'opencode', command: 'opencode' }
+        }
+      };
+
+      vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
+      vi.mocked(prepareEnvironment).mockResolvedValue({ tempDirectory: '/tmp/test' });
+      mockRunner.run.mockReturnValue({
+        outputs: [{ type: 'tool_call', data: { tool_name: 'Write' }, session_id: 'ses_1', timestamp: 1 }],
+        sessionId: 'ses_1'
+      });
+      vi.mocked(verifyAssertions).mockResolvedValue([
+        { type: 'should_call_tool', value: 'Write', passed: true, message: 'Tool called' }
+      ]);
+
+      const yamlPath = path.join(TEST_DIR, 'test.yaml');
+      await fs.writeFile(yamlPath, 'name: test');
+
+      await runTests(yamlPath);
+
+      // startStep 只在第一次运行时调用
+      expect(logger.startStep).toHaveBeenCalledTimes(1);
+      expect(logger.startStep).toHaveBeenCalledWith('multi-run-progress', 'Create file', 1, 1);
+
+      // showProgress 每次运行都调用（3 次）
+      expect(logger.showProgress).toHaveBeenCalledTimes(3);
+      expect(logger.showProgress).toHaveBeenNthCalledWith(1, 'multi-run-progress', 'Step 1/1, Run 1/3...');
+      expect(logger.showProgress).toHaveBeenNthCalledWith(2, 'multi-run-progress', 'Step 1/1, Run 2/3...');
+      expect(logger.showProgress).toHaveBeenNthCalledWith(3, 'multi-run-progress', 'Step 1/1, Run 3/3...');
+
+      // endStep 只在第一次运行时调用
+      expect(logger.endStep).toHaveBeenCalledTimes(1);
+    });
   });
 });
