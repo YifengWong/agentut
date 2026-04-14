@@ -2,7 +2,7 @@ import fs from 'fs-extra';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { execSync } from 'child_process';
-import { SetupError, ValidationError, type EnvironmentConfig, type SetupAction, type GlobalConfig } from '../types/index.js';
+import { SetupError, ValidationError, type EnvironmentConfig, type SetupAction, type GlobalConfig, type CleanupResult } from '../types/index.js';
 import { logger } from '../output/logger.js';
 
 interface CopySpec {
@@ -134,19 +134,18 @@ export async function executeSetup(
 }
 
 export async function cleanupEnvironment(
-  directory: string,
-  shouldCleanup: boolean,
-  scenarioName?: string
-): Promise<void> {
-  if (shouldCleanup) {
-    if (scenarioName) {
-      logger.cleanup(scenarioName);
+  directory: string
+): Promise<CleanupResult> {
+  try {
+    const exists = await fs.pathExists(directory);
+    if (!exists) {
+      return { cleaned: false, path: directory, error: 'Directory does not exist' };
     }
-    try {
-      await fs.remove(directory);
-    } catch {
-      // Ignore cleanup errors (e.g., file locked on Windows)
-    }
+    await fs.remove(directory);
+    return { cleaned: true, path: directory };
+  } catch (err) {
+    const error = err instanceof Error ? err.message : 'Unknown error';
+    return { cleaned: false, path: directory, error };
   }
 }
 

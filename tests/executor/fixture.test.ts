@@ -241,49 +241,56 @@ describe('Fixture Manager', () => {
   });
 
   describe('cleanupEnvironment', () => {
-    it('should remove directory when cleanup is true', async () => {
+    it('should remove directory and return cleaned: true', async () => {
       const tempDir = path.join(TEST_TEMP_DIR, 'to-cleanup');
       await fs.ensureDir(tempDir);
+      await fs.writeFile(path.join(tempDir, 'file.txt'), 'content');
 
-      await cleanupEnvironment(tempDir, true);
+      const result = await cleanupEnvironment(tempDir);
 
+      expect(result.cleaned).toBe(true);
+      expect(result.path).toBe(tempDir);
       expect(await fs.pathExists(tempDir)).toBe(false);
     });
 
-    it('should keep directory when cleanup is false', async () => {
-      const tempDir = path.join(TEST_TEMP_DIR, 'to-keep');
-      await fs.ensureDir(tempDir);
+    it('should return cleaned: false with error when directory does not exist', async () => {
+      const nonExistentDir = path.join(TEST_TEMP_DIR, 'non-existent');
 
-      await cleanupEnvironment(tempDir, false);
+      const result = await cleanupEnvironment(nonExistentDir);
 
-      expect(await fs.pathExists(tempDir)).toBe(true);
+      expect(result.cleaned).toBe(false);
+      expect(result.path).toBe(nonExistentDir);
+      expect(result.error).toBeDefined();
     });
 
-    it('should call logger.cleanup when scenarioName is provided', async () => {
-      const tempDir = path.join(TEST_TEMP_DIR, 'to-cleanup-log');
+    it('should return cleaned: false with error when fs.remove fails', async () => {
+      const tempDir = path.join(TEST_TEMP_DIR, 'locked-dir');
       await fs.ensureDir(tempDir);
 
-      await cleanupEnvironment(tempDir, true, 'test-scenario');
+      // Mock fs.remove to throw an error
+      vi.spyOn(fs, 'remove').mockImplementationOnce(async () => {
+        throw new Error('Permission denied');
+      });
 
-      expect(mockedLogger.cleanup).toHaveBeenCalledWith('test-scenario');
+      const result = await cleanupEnvironment(tempDir);
+
+      expect(result.cleaned).toBe(false);
+      expect(result.path).toBe(tempDir);
+      expect(result.error).toBe('Permission denied');
+
+      // Restore and cleanup
+      vi.mocked(fs.remove).mockRestore();
+      await fs.remove(tempDir);
     });
 
-    it('should not call logger.cleanup when scenarioName is not provided', async () => {
-      const tempDir = path.join(TEST_TEMP_DIR, 'to-cleanup-no-log');
-      await fs.ensureDir(tempDir);
+    it('should clean empty directory successfully', async () => {
+      const emptyDir = path.join(TEST_TEMP_DIR, 'empty-dir');
+      await fs.ensureDir(emptyDir);
 
-      await cleanupEnvironment(tempDir, true);
+      const result = await cleanupEnvironment(emptyDir);
 
-      expect(mockedLogger.cleanup).not.toHaveBeenCalled();
-    });
-
-    it('should not call logger.cleanup when cleanup is false', async () => {
-      const tempDir = path.join(TEST_TEMP_DIR, 'to-keep-no-log');
-      await fs.ensureDir(tempDir);
-
-      await cleanupEnvironment(tempDir, false, 'test-scenario');
-
-      expect(mockedLogger.cleanup).not.toHaveBeenCalled();
+      expect(result.cleaned).toBe(true);
+      expect(await fs.pathExists(emptyDir)).toBe(false);
     });
   });
 
