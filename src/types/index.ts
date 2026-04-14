@@ -22,6 +22,7 @@ export interface SetupAction {
 export interface ScenarioConfig {
   name: string;
   environment: string;
+  /** @deprecated Cleanup strategy is now controlled by CLI --clean parameter or agentut clean command */
   cleanup: boolean;
   steps: StepConfig[];
   runs?: number;      // 概率测试：覆盖全局设置
@@ -323,6 +324,14 @@ export interface AssertionResult {
     responses?: string[];
   };
   message?: string;
+}
+
+// ========== Cleanup Types ==========
+
+export interface CleanupResult {
+  cleaned: boolean;
+  path: string;
+  error?: string;
 }
 
 // ========== OpenCode Output Types ==========
