@@ -5,6 +5,7 @@ import { initProject } from './commands/init.js';
 import { suggestTest } from './commands/suggest.js';
 import { runTests } from './commands/run.js';
 import { generateReport } from './commands/report.js';
+import { cleanTempDirectories } from './commands/clean.js';
 import { formatAsMarkdown } from './output/formatters/markdown.js';
 import { formatAsHtml } from './output/formatters/html.js';
 import { formatAsJest } from './output/formatters/jest.js';
@@ -79,6 +80,7 @@ program
   .option('--runs <n>', 'Override runs configuration', parseInt)
   .option('--min-pass <n>', 'Override min_pass configuration', parseInt)
   .option('--quick', 'Quick mode: single run (runs=1, min_pass=1)')
+  .option('--clean', 'Clean temporary directories after run')
   .action(async (testFile, options) => {
     try {
       const result = await runTests(testFile, {
@@ -90,7 +92,8 @@ program
         agent: options.agent,
         runs: options.runs,
         min_pass: options.minPass,
-        quick: options.quick
+        quick: options.quick,
+        clean: options.clean
       });
 
       // Format output
@@ -145,6 +148,23 @@ program
         console.log(report);
       } else {
         console.log(`✓ Report written to ${options.output}`);
+      }
+    } catch (error) {
+      console.error('Error:', error instanceof Error ? error.message : 'Unknown error');
+      process.exit(1);
+    }
+  });
+
+// clean command
+program
+  .command('clean')
+  .description('Clean temporary directories (.agentut/temp)')
+  .option('-d, --directory <path>', 'Working directory', '.')
+  .action(async (options) => {
+    try {
+      const result = await cleanTempDirectories(options.directory);
+      if (result.failedCount > 0) {
+        process.exit(1);
       }
     } catch (error) {
       console.error('Error:', error instanceof Error ? error.message : 'Unknown error');

@@ -2,7 +2,8 @@ import fs from 'fs-extra';
 import * as path from 'path';
 import { parseAndValidateYaml } from '../parser/yaml.js';
 import { createRunner } from '../runner/factory.js';
-import { prepareEnvironment, cleanupEnvironment } from '../executor/fixture.js';
+import { prepareEnvironment } from '../executor/fixture.js';
+import { cleanTempDirectories } from './clean.js';
 import { verifyAssertions } from '../executor/verifier.js';
 import { generateTestResult } from '../output/json.js';
 import { logger } from '../output/logger.js';
@@ -34,6 +35,8 @@ export interface RunOptions {
   runs?: number;
   min_pass?: number;
   quick?: boolean;
+  // 清理选项
+  clean?: boolean;
 }
 
 export async function runTests(
@@ -90,6 +93,11 @@ export async function runTests(
 
   // Log summary
   logger.summary(passedCount, failedCount, totalDuration);
+
+  // Clean if --clean option is specified
+  if (options.clean) {
+    await cleanTempDirectories(yamlDirectory);
+  }
 
   // Generate result
   const testResult = generateTestResult(suite, scenarioResults, testPath);
@@ -307,15 +315,9 @@ async function executeScenario(
       };
       allRunExecutions.push(runExecution);
 
-      // Cleanup for this run
-      if (tempDirectory) {
-        // 传统单次运行模式使用原始 scenario name，多运行模式使用 `${scenario.name}-run${runIndex}`
-        const scenarioNameForRun = isTraditionalSingleRun ? scenario.name : `${scenario.name}-run${runIndex}`;
-        await cleanupEnvironment(tempDirectory, scenario.cleanup, scenarioNameForRun);
-        // 如果 cleanup 为 false，保存第一次运行的临时目录用于返回
-        if (!scenario.cleanup && runIndex === 0) {
-          preservedTempDirectory = tempDirectory;
-        }
+      // Preserve temp directory for result (first successful run)
+      if (tempDirectory && runIndex === 0) {
+        preservedTempDirectory = tempDirectory;
       }
     } catch (err) {
       if (err instanceof Error) {
@@ -404,7 +406,7 @@ async function executeScenario(
     duration_ms: Date.now() - startTime,
     steps: stepResults,
     error: lastError,
-    tempDirectory: scenario.cleanup ? undefined : preservedTempDirectory,
+    tempDirectory: preservedTempDirectory,
     // 概率测试扩展字段：只有在显式配置多运行时才返回这些字段
     runs: !isTraditionalSingleRun ? effectiveRuns : undefined,
     min_pass: !isTraditionalSingleRun ? effectiveMinPass : undefined,

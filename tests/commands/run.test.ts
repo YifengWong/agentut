@@ -16,8 +16,7 @@ vi.mock('../../src/runner/factory.js', () => ({
 }));
 
 vi.mock('../../src/executor/fixture.js', () => ({
-  prepareEnvironment: vi.fn(),
-  cleanupEnvironment: vi.fn()
+  prepareEnvironment: vi.fn()
 }));
 
 vi.mock('../../src/executor/verifier.js', () => ({
@@ -42,11 +41,16 @@ vi.mock('../../src/output/logger.js', () => ({
   }
 }));
 
+vi.mock('../../src/commands/clean.js', () => ({
+  cleanTempDirectories: vi.fn()
+}));
+
 import { parseAndValidateYaml } from '../../src/parser/yaml.js';
 import { createRunner } from '../../src/runner/factory.js';
-import { prepareEnvironment, cleanupEnvironment } from '../../src/executor/fixture.js';
+import { prepareEnvironment } from '../../src/executor/fixture.js';
 import { verifyAssertions } from '../../src/executor/verifier.js';
 import { logger } from '../../src/output/logger.js';
+import { cleanTempDirectories } from '../../src/commands/clean.js';
 
 describe('run command', () => {
   const mockRunner = {
@@ -136,65 +140,6 @@ describe('run command', () => {
 
     expect(result.scenarios).toHaveLength(1);
     expect(result.scenarios[0].name).toBe('scenario-1');
-  });
-
-  it('should cleanup environment after scenario', async () => {
-    const mockSuite: YamlTestSuite = {
-      name: 'test',
-      environments: {
-        default: { directory: './test', setup: [] }
-      },
-      scenarios: [{
-        name: 'cleanup-test',
-        environment: 'default',
-        cleanup: true,
-        steps: []
-      }],
-      config: {
-        agent_cli: { runner: 'opencode', command: 'opencode' }
-      }
-    };
-
-    vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
-    vi.mocked(prepareEnvironment).mockResolvedValue({ tempDirectory: '/tmp/test' });
-    vi.mocked(verifyAssertions).mockResolvedValue([]);
-
-    const yamlPath = path.join(TEST_DIR, 'test.yaml');
-    await fs.writeFile(yamlPath, 'name: test');
-
-    await runTests(yamlPath);
-
-    expect(cleanupEnvironment).toHaveBeenCalledWith('/tmp/test', true, 'cleanup-test');
-  });
-
-  it('should preserve temp directory when cleanup is false', async () => {
-    const mockSuite: YamlTestSuite = {
-      name: 'test',
-      environments: {
-        default: { directory: './test', setup: [] }
-      },
-      scenarios: [{
-        name: 'no-cleanup',
-        environment: 'default',
-        cleanup: false,
-        steps: []
-      }],
-      config: {
-        agent_cli: { runner: 'opencode', command: 'opencode' }
-      }
-    };
-
-    vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
-    vi.mocked(prepareEnvironment).mockResolvedValue({ tempDirectory: '/tmp/test' });
-    vi.mocked(verifyAssertions).mockResolvedValue([]);
-
-    const yamlPath = path.join(TEST_DIR, 'test.yaml');
-    await fs.writeFile(yamlPath, 'name: test');
-
-    const result = await runTests(yamlPath);
-
-    expect(cleanupEnvironment).toHaveBeenCalledWith('/tmp/test', false, 'no-cleanup');
-    expect(result.scenarios[0].tempDirectory).toBe('/tmp/test');
   });
 
   it('should handle scenario with empty assertions', async () => {
@@ -445,35 +390,6 @@ describe('run command', () => {
       await runTests(yamlPath);
 
       expect(logger.summary).toHaveBeenCalledWith(0, 1, expect.any(Number));
-    });
-
-    it('should pass scenarioName to cleanupEnvironment', async () => {
-      const mockSuite: YamlTestSuite = {
-        name: 'test',
-        environments: {
-          default: { directory: './test', setup: [] }
-        },
-        scenarios: [{
-          name: 'my-scenario',
-          environment: 'default',
-          cleanup: true,
-          steps: []
-        }],
-        config: {
-          agent_cli: { runner: 'opencode', command: 'opencode' }
-        }
-      };
-
-      vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
-      vi.mocked(prepareEnvironment).mockResolvedValue({ tempDirectory: '/tmp/test' });
-      vi.mocked(verifyAssertions).mockResolvedValue([]);
-
-      const yamlPath = path.join(TEST_DIR, 'test.yaml');
-      await fs.writeFile(yamlPath, 'name: test');
-
-      await runTests(yamlPath);
-
-      expect(cleanupEnvironment).toHaveBeenCalledWith('/tmp/test', true, 'my-scenario');
     });
   });
 
@@ -815,6 +731,68 @@ describe('run command', () => {
 
       // endStep 只在第一次运行时调用
       expect(logger.endStep).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // --clean option tests
+  describe('--clean option', () => {
+    it('should call cleanTempDirectories when --clean is specified', async () => {
+      const mockSuite: YamlTestSuite = {
+        name: 'test',
+        environments: {
+          default: { directory: './test', setup: [] }
+        },
+        scenarios: [{
+          name: 'clean-test',
+          environment: 'default',
+          cleanup: true,
+          steps: []
+        }],
+        config: {
+          agent_cli: { runner: 'opencode', command: 'opencode' }
+        }
+      };
+
+      vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
+      vi.mocked(prepareEnvironment).mockResolvedValue({ tempDirectory: '/tmp/test' });
+      vi.mocked(verifyAssertions).mockResolvedValue([]);
+      vi.mocked(cleanTempDirectories).mockResolvedValue({ cleanedCount: 1, failedCount: 0, errors: [] });
+
+      const yamlPath = path.join(TEST_DIR, 'test.yaml');
+      await fs.writeFile(yamlPath, 'name: test');
+
+      await runTests(yamlPath, { clean: true });
+
+      expect(cleanTempDirectories).toHaveBeenCalled();
+    });
+
+    it('should not call cleanTempDirectories when --clean is not specified', async () => {
+      const mockSuite: YamlTestSuite = {
+        name: 'test',
+        environments: {
+          default: { directory: './test', setup: [] }
+        },
+        scenarios: [{
+          name: 'no-clean-test',
+          environment: 'default',
+          cleanup: true,
+          steps: []
+        }],
+        config: {
+          agent_cli: { runner: 'opencode', command: 'opencode' }
+        }
+      };
+
+      vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
+      vi.mocked(prepareEnvironment).mockResolvedValue({ tempDirectory: '/tmp/test' });
+      vi.mocked(verifyAssertions).mockResolvedValue([]);
+
+      const yamlPath = path.join(TEST_DIR, 'test.yaml');
+      await fs.writeFile(yamlPath, 'name: test');
+
+      await runTests(yamlPath);
+
+      expect(cleanTempDirectories).not.toHaveBeenCalled();
     });
   });
 });
