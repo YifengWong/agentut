@@ -208,34 +208,45 @@ describe('clean command', () => {
     await fs.remove(TEST_TEMP_DIR);
   });
 
-  it('should clean existing temp directories and report count', async () => {
-    // Create temp directories
-    const tempRoot = path.join(TEST_TEMP_DIR, '.agentut', 'temp');
-    await fs.ensureDir(tempRoot);
-    await fs.ensureDir(path.join(tempRoot, 'scenario-1-abc-123'));
-    await fs.ensureDir(path.join(tempRoot, 'scenario-2-def-456'));
-    await fs.writeFile(path.join(tempRoot, 'scenario-1-abc-123', 'file.txt'), 'content');
+  it('should clean temp directories in nested locations', async () => {
+    // Create temp directories in multiple nested paths
+    const tempRoot1 = path.join(TEST_TEMP_DIR, '.agentut', 'temp');
+    const tempRoot2 = path.join(TEST_TEMP_DIR, 'subdir', '.agentut', 'temp');
+    await fs.ensureDir(tempRoot1);
+    await fs.ensureDir(tempRoot2);
+    await fs.ensureDir(path.join(tempRoot1, 'scenario-1-abc-123'));
+    await fs.ensureDir(path.join(tempRoot2, 'scenario-2-def-456'));
+    await fs.writeFile(path.join(tempRoot1, 'scenario-1-abc-123', 'file.txt'), 'content');
 
     await cleanTempDirectories(TEST_TEMP_DIR);
 
-    expect(await fs.pathExists(tempRoot)).toBe(false);
-    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Cleaned 2 temporary directories'));
+    expect(await fs.pathExists(tempRoot1)).toBe(false);
+    expect(await fs.pathExists(tempRoot2)).toBe(false);
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Cleaned 2 temporary directories in 2 locations'));
   });
 
-  it('should report no temp directories when temp root does not exist', async () => {
+  it('should report no temp directories when none exist', async () => {
     await cleanTempDirectories(TEST_TEMP_DIR);
 
     expect(console.log).toHaveBeenCalledWith(expect.stringContaining('No temporary directories to clean'));
   });
 
-  it('should report no temp directories when temp root is empty', async () => {
-    const tempRoot = path.join(TEST_TEMP_DIR, '.agentut', 'temp');
-    await fs.ensureDir(tempRoot);
+  it('should clean only in specified directory', async () => {
+    // Create temp directories in two locations
+    const tempRoot1 = path.join(TEST_TEMP_DIR, '.agentut', 'temp');
+    const subdir = path.join(TEST_TEMP_DIR, 'subdir');
+    const tempRoot2 = path.join(subdir, '.agentut', 'temp');
+    await fs.ensureDir(tempRoot1);
+    await fs.ensureDir(tempRoot2);
+    await fs.ensureDir(path.join(tempRoot1, 'scenario-1'));
+    await fs.ensureDir(path.join(tempRoot2, 'scenario-2'));
 
-    await cleanTempDirectories(TEST_TEMP_DIR);
+    // Clean only the subdir
+    await cleanTempDirectories(subdir);
 
-    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('No temporary directories to clean'));
-    expect(await fs.pathExists(tempRoot)).toBe(true);
+    // tempRoot1 should still exist, tempRoot2 should be cleaned
+    expect(await fs.pathExists(tempRoot1)).toBe(true);
+    expect(await fs.pathExists(tempRoot2)).toBe(false);
   });
 
   it('should handle cleanup failures gracefully', async () => {
@@ -245,10 +256,8 @@ describe('clean command', () => {
 
     // Mock fs.remove to fail on one directory
     const originalRemove = fs.remove;
-    let callCount = 0;
     vi.spyOn(fs, 'remove').mockImplementation(async (p: string) => {
-      callCount++;
-      if (callCount === 1 && p === tempRoot) {
+      if (p.includes('scenario-1')) {
         throw new Error('Permission denied');
       }
       return originalRemove(p);
@@ -283,62 +292,106 @@ export interface CleanResult {
   errors: string[];
 }
 
+/**
+ * Recursively find all .agentut/temp directories under a given root
+ */
+async function findTempRoots(rootDir: string): Promise<string[]> {
+  const tempRoots: string[] = [];
+  
+  async function search(currentDir: string): Promise<void> {
+    const tempPath = path.join(currentDir, '.agentut', 'temp');
+    if (await fs.pathExists(tempPath)) {
+      tempRoots.push(tempPath);
+    }
+    
+    // Recursively search subdirectories (excluding .agentut itself)
+    try {
+      const dirents = await fs.readdir(currentDir, { withFileTypes: true });
+      for (const dirent of dirents) {
+        if (dirent.isDirectory() && dirent.name !== '.agentut') {
+          await search(path.join(currentDir, dirent.name));
+        }
+      }
+    } catch {
+      // Ignore errors (permission denied, etc.)
+    }
+  }
+  
+  await search(rootDir);
+  return tempRoots;
+}
+
 export async function cleanTempDirectories(
   workingDirectory: string
 ): Promise<CleanResult> {
-  const tempRoot = path.resolve(workingDirectory, '.agentut', 'temp');
-
-  // Check if temp root exists
-  if (!await fs.pathExists(tempRoot)) {
+  // Recursively find all .agentut/temp directories
+  const tempRoots = await findTempRoots(workingDirectory);
+  
+  if (tempRoots.length === 0) {
     console.log('No temporary directories to clean');
     return { cleanedCount: 0, failedCount: 0, errors: [] };
   }
 
-  // List subdirectories
-  let entries: string[];
-  try {
-    const dirents = await fs.readdir(tempRoot, { withFileTypes: true });
-    entries = dirents
-      .filter(d => d.isDirectory())
-      .map(d => path.join(tempRoot, d.name));
-  } catch {
-    console.log('No temporary directories to clean');
-    return { cleanedCount: 0, failedCount: 0, errors: [] };
-  }
+  let cleanedCount = 0;
+  let failedCount = 0;
+  const errors: string[] = [];
 
-  if (entries.length === 0) {
-    console.log('No temporary directories to clean');
-    return { cleanedCount: 0, failedCount: 0, errors: [] };
-  }
-
-  // Clean each directory
-  const results = await Promise.all(
-    entries.map(dir => cleanupEnvironment(dir))
-  );
-
-  const cleanedCount = results.filter(r => r.cleaned).length;
-  const failedResults = results.filter(r => !r.cleaned);
-  const errors = failedResults.map(r => `${r.path}: ${r.error}`);
-
-  // Try to remove the empty temp root if all subdirs were cleaned
-  if (failedResults.length === 0) {
+  // Clean each temp root
+  for (const tempRoot of tempRoots) {
+    // List subdirectories within this temp root
     try {
-      await fs.remove(tempRoot);
-    } catch {
-      // Ignore error removing temp root
+      const dirents = await fs.readdir(tempRoot, { withFileTypes: true });
+      const subdirs = dirents
+        .filter(d => d.isDirectory())
+        .map(d => path.join(tempRoot, d.name));
+
+      if (subdirs.length === 0) {
+        continue;
+      }
+
+      // Clean each subdirectory
+      for (const subdir of subdirs) {
+        const result = await cleanupEnvironment(subdir);
+        if (result.cleaned) {
+          cleanedCount++;
+        } else {
+          failedCount++;
+          errors.push(`${result.path}: ${result.error}`);
+        }
+      }
+
+      // Remove empty temp root if all subdirs were cleaned
+      try {
+        const remaining = await fs.readdir(tempRoot);
+        if (remaining.length === 0) {
+          await fs.remove(tempRoot);
+          // Also try to remove parent .agentut if empty
+          const agentutDir = path.dirname(tempRoot);
+          const agentutRemaining = await fs.readdir(agentutDir);
+          if (agentutRemaining.length === 0) {
+            await fs.remove(agentutDir);
+          }
+        }
+      } catch {
+        // Ignore errors removing empty directories
+      }
+    } catch (err) {
+      const error = err instanceof Error ? err.message : 'Unknown error';
+      errors.push(`${tempRoot}: ${error}`);
+      failedCount++;
     }
   }
 
   if (cleanedCount > 0) {
-    console.log(`✓ Cleaned ${cleanedCount} temporary directories`);
+    console.log(`✓ Cleaned ${cleanedCount} temporary directories in ${tempRoots.length} locations`);
   }
 
-  if (failedResults.length > 0) {
-    console.log(`⚠ Failed to clean ${failedResults.length} directories:`);
+  if (failedCount > 0) {
+    console.log(`⚠ Failed to clean ${failedCount} directories:`);
     errors.forEach(e => console.log(`  ${e}`));
   }
 
-  return { cleanedCount, failedCount: failedResults.length, errors };
+  return { cleanedCount, failedCount, errors };
 }
 ```
 

@@ -74,7 +74,7 @@ environments:
 scenarios:
   - name: create-file
     environment: default
-    cleanup: true
+    cleanup: true  # @deprecated - 清理策略已改为 CLI 控制
     steps:
       - input: "创建 hello.txt 文件"
         expected:
@@ -361,7 +361,7 @@ agentut suggest <testFile> [-s sessionId] [--latest] [-o file] [--skill name] [-
 运行测试用例。
 
 ```bash
-agentut run <testFile> [-f format] [-o file] [-s scenario]
+agentut run <testFile> [-f format] [-o file] [-s scenario] [--clean]
 ```
 
 **选项**：
@@ -371,6 +371,23 @@ agentut run <testFile> [-f format] [-o file] [-s scenario]
 - `--parallel` - 并行运行场景
 - `-m, --model <model>` - 覆盖模型配置
 - `-a, --agent <agent>` - 覆盖 agent 配置
+- `--clean` - 运行结束后清理临时目录（默认保留）
+
+### agentut clean
+
+清理临时目录。
+
+```bash
+agentut clean [-d directory]
+```
+
+**选项**：
+- `-d, --directory <path>` — 起始目录，默认当前目录
+
+**行为**：
+- 递归查找起始目录及所有子目录下的 `.agentut/temp/` 目录
+- 清理找到的所有临时测试目录
+- 输出清理数量和位置数
 
 ### agentut report
 
@@ -394,7 +411,6 @@ Running scenario 1/2: create-file
 [create-file] Step 1/1: "创建 hello.txt 文件"
 [create-file] ⏳ executing...
 [create-file] ✓ Step 1/1 passed (12.5s)
-[create-file] Cleaning up...
 ✓ create-file passed (12.6s)
 
 Running scenario 2/2: read-file
@@ -404,7 +420,6 @@ Running scenario 2/2: read-file
 [read-file] Step 1/1: "读取 hello.txt 文件内容"
 [read-file] ⏳ executing...
 [read-file] ✓ Step 1/1 passed (8.3s)
-[read-file] Cleaning up...
 ✓ read-file passed (8.4s)
 
 Summary: 2 passed, 0 failed (total 21s)
@@ -414,8 +429,31 @@ Summary: 2 passed, 0 failed (total 21s)
 - **场景准备**：环境初始化、fixture 复制操作
 - **步骤执行**：每个步骤的输入、执行状态和结果
 - **执行中状态**：`⏳ executing...` 表示 Agent 正在处理
-- **清理操作**：测试结束后的临时目录清理
 - **汇总统计**：通过/失败数量和总耗时
+
+**注意**：临时目录默认保留（便于调试），路径记录在结果的 `tempDirectory` 字段中。使用 `--clean` 参数或 `agentut clean` 命令清理。
+
+## 临时目录清理
+
+测试运行会在 `.agentut/temp/` 下创建临时工作目录。清理策略：
+
+| 方式 | 说明 |
+|------|------|
+| 默认行为 | 不清理，保留临时目录供事后检查 |
+| `--clean` 参数 | 运行结束后立即清理 |
+| `agentut clean` | 事后清理所有临时目录 |
+
+**推荐用法**：
+- **本地开发调试**：默认不清理，检查失败现场
+- **CI 环境**：使用 `--clean` 参数自动清理
+
+```bash
+# CI 环境：运行后自动清理
+agentut run ./tests/ --clean
+
+# 本地调试：事后手动清理
+agentut clean
+```
 
 ## 输出格式
 
