@@ -1,0 +1,39 @@
+.npmrc
+**/.agentut/
+
+# Source maps 
+**/*.map
+**/*.js.map
+**/*.d.ts.map
+
+# 源代码
+src/
+*.ts
+!*.d.ts
+
+# 开发配置
+tsconfig.json
+.npmrc
+.gitignore
+.eslintrc*
+.prettierrc*
+
+# 测试相关
+tests/
+test/
+**/__tests__/
+**/*.test.ts
+**/*.spec.ts
+coverage/
+
+# 文档
+*.md
+!README.md
+docs/
+
+# 开发工具
+.editorconfig
+.vscode/
+.idea/
+
+notes.md

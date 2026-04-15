@@ -5,3 +5,4 @@ dist/
 .agentut/
 coverage/
 .npmrc
+notes.md
