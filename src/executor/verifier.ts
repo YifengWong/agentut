@@ -1,12 +1,17 @@
 import fs from 'fs-extra';
 import * as path from 'path';
+import { createRunner } from '../runner/factory.js';
+import { writeTempJson } from './temp-file.js';
 import {
   type Assertion,
   type OpenCodeRunOutput,
   type AssertionResult,
   type Matcher,
   type ToolCallAssertion,
-  type FileContentAssertion
+  type FileContentAssertion,
+  type JudgedByAssertion,
+  type AgentCliConfig,
+  type GlobalConfig
 } from '../types/index.js';
 
 /**
@@ -401,4 +406,118 @@ export async function verifyAssertions(
   }
 
   return results;
+}
+
+// ========== AI Judge Assertion ==========
+
+// 内置格式引导 prompt
+const JUDGE_OUTPUT_FORMAT_PROMPT = `Please evaluate the input content. Your response must strictly use the following JSON format, without any other content:
+{"passed":boolean,"reason":"string"}
+
+Where:
+- passed: evaluation result, true means pass, false means fail
+- reason: brief explanation of the evaluation`;
+
+/**
+ * 从裁判输出中提取 JSON 结果
+ */
+function extractJudgeResult(outputs: OpenCodeRunOutput[]): { passed: boolean; reason?: string } {
+  for (const output of outputs) {
+    if (output.type === 'text') {
+      const text = output.part?.text || output.data?.content || '';
+      try {
+        const parsed = JSON.parse(text.trim());
+        if (typeof parsed.passed === 'boolean') {
+          return parsed;
+        }
+      } catch {
+        // Non-JSON, continue searching
+      }
+    }
+  }
+
+  return { passed: false, reason: 'No valid judge result found in output' };
+}
+
+/**
+ * AI裁判断言验证
+ */
+export async function verifyJudgedBy(
+  outputs: OpenCodeRunOutput[],
+  assertion: JudgedByAssertion,
+  judges: Record<string, AgentCliConfig>,
+  defaultTimeout: number,
+  tempRoot: string
+): Promise<AssertionResult> {
+  const judgeName = assertion.judge;
+
+  // 1. 检查裁判配置是否存在
+  const judgeConfig = judges[judgeName];
+  if (!judgeConfig) {
+    return {
+      type: 'judged_by',
+      value: assertion,
+      passed: false,
+      message: `Judge '${judgeName}' not found in config.judges`
+    };
+  }
+
+  // 2. 写入临时文件
+  let tempFile: string;
+  try {
+    tempFile = await writeTempJson(outputs, tempRoot);
+  } catch (err) {
+    return {
+      type: 'judged_by',
+      value: assertion,
+      passed: false,
+      message: `Failed to write temp file: ${err instanceof Error ? err.message : 'Unknown error'}`
+    };
+  }
+
+  // 3. 组合 prompt（内置格式引导 + 用户 prompt）
+  const combinedPrompt = `${JUDGE_OUTPUT_FORMAT_PROMPT}\n\n${assertion.prompt}`;
+
+  // 4. 创建 Runner 并执行
+  const runner = createRunner(judgeConfig);
+  const timeout = assertion.timeout || defaultTimeout;
+
+  try {
+    const result = runner.run({
+      input: combinedPrompt,
+      file: tempFile,
+      timeout
+    });
+
+    // 5. 解析裁判输出
+    const judgeResult = extractJudgeResult(result.outputs);
+
+    return {
+      type: 'judged_by',
+      value: assertion,
+      passed: judgeResult.passed,
+      actual: { reason: judgeResult.reason },
+      message: judgeResult.passed
+        ? `Judge '${judgeName}' passed: ${judgeResult.reason || 'OK'}`
+        : `Judge '${judgeName}' failed: ${judgeResult.reason || 'No reason provided'}`
+    };
+
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+
+    return {
+      type: 'judged_by',
+      value: assertion,
+      passed: false,
+      message: `Judge '${judgeName}' execution error: ${errorMessage}`
+    };
+
+  } finally {
+    // 6. 清理临时文件
+    try {
+      await fs.remove(tempFile);
+    } catch {
+      // 清理失败不影响结果
+    }
+  }
 }

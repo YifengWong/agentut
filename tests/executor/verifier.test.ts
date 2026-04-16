@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'fs-extra';
 import * as path from 'path';
 import {
@@ -6,9 +6,17 @@ import {
   verifyShouldCallTool,
   verifyShouldProduceFile,
   verifyFileContentContains,
-  verifyResponseContains
+  verifyResponseContains,
+  verifyJudgedBy
 } from '../../src/executor/verifier.js';
-import { type Assertion, type OpenCodeRunOutput, type StepResult } from '../../src/types/index.js';
+import { type Assertion, type OpenCodeRunOutput, type StepResult, type AgentCliConfig, type JudgedByAssertion } from '../../src/types/index.js';
+
+// Mock createRunner
+vi.mock('../../src/runner/factory.js', () => ({
+  createRunner: vi.fn()
+}));
+
+import { createRunner } from '../../src/runner/factory.js';
 
 const TEST_TEMP_DIR = './test-temp-verifier';
 
@@ -632,5 +640,389 @@ describe('Verifier', () => {
 
       expect(results).toHaveLength(0);
     });
+  });
+});
+
+describe('verifyJudgedBy', () => {
+  const mockJudges: Record<string, AgentCliConfig> = {
+    'test-judge': { runner: 'opencode', command: 'opencode' },
+    'another-judge': { runner: 'opencode', command: 'opencode' }
+  };
+  const defaultTimeout = 30000;
+  const tempRoot = TEST_TEMP_DIR;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should return false when judge is not configured', async () => {
+    const assertion: JudgedByAssertion = {
+      judge: 'non-existent-judge',
+      prompt: 'Evaluate the output'
+    };
+
+    const result = await verifyJudgedBy(
+      [],
+      assertion,
+      mockJudges,
+      defaultTimeout,
+      tempRoot
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.type).toBe('judged_by');
+    expect(result.message).toContain('not found');
+    expect(result.message).toContain('non-existent-judge');
+  });
+
+  it('should return true when judge returns passed=true', async () => {
+    const mockRunner = {
+      runnerType: 'opencode',
+      run: vi.fn().mockReturnValue({
+        outputs: [
+          { type: 'text', part: { text: '{"passed":true,"reason":"All checks passed"}' } }
+        ],
+        sessionId: 'judge-session-1'
+      }),
+      exportSession: vi.fn(),
+      listSessions: vi.fn()
+    };
+
+    vi.mocked(createRunner).mockReturnValue(mockRunner as any);
+
+    const assertion: JudgedByAssertion = {
+      judge: 'test-judge',
+      prompt: 'Check if output is correct'
+    };
+
+    const outputs: OpenCodeRunOutput[] = [
+      { type: 'text', part: { text: 'Some output' } }
+    ];
+
+    const result = await verifyJudgedBy(
+      outputs,
+      assertion,
+      mockJudges,
+      defaultTimeout,
+      tempRoot
+    );
+
+    expect(result.passed).toBe(true);
+    expect(result.type).toBe('judged_by');
+    expect(result.message).toContain('passed');
+    expect(result.message).toContain('All checks passed');
+    expect(result.actual?.reason).toBe('All checks passed');
+  });
+
+  it('should return false when judge returns passed=false', async () => {
+    const mockRunner = {
+      runnerType: 'opencode',
+      run: vi.fn().mockReturnValue({
+        outputs: [
+          { type: 'text', part: { text: '{"passed":false,"reason":"Missing required content"}' } }
+        ],
+        sessionId: 'judge-session-2'
+      }),
+      exportSession: vi.fn(),
+      listSessions: vi.fn()
+    };
+
+    vi.mocked(createRunner).mockReturnValue(mockRunner as any);
+
+    const assertion: JudgedByAssertion = {
+      judge: 'test-judge',
+      prompt: 'Verify the output contains X'
+    };
+
+    const result = await verifyJudgedBy(
+      [],
+      assertion,
+      mockJudges,
+      defaultTimeout,
+      tempRoot
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.type).toBe('judged_by');
+    expect(result.message).toContain('failed');
+    expect(result.message).toContain('Missing required content');
+    expect(result.actual?.reason).toBe('Missing required content');
+  });
+
+  it('should handle execution error', async () => {
+    const mockRunner = {
+      runnerType: 'opencode',
+      run: vi.fn().mockImplementation(() => {
+        throw new Error('CLI crashed');
+      }),
+      exportSession: vi.fn(),
+      listSessions: vi.fn()
+    };
+
+    vi.mocked(createRunner).mockReturnValue(mockRunner as any);
+
+    const assertion: JudgedByAssertion = {
+      judge: 'test-judge',
+      prompt: 'Test prompt'
+    };
+
+    const result = await verifyJudgedBy(
+      [],
+      assertion,
+      mockJudges,
+      defaultTimeout,
+      tempRoot
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.type).toBe('judged_by');
+    expect(result.message).toContain('execution error');
+    expect(result.message).toContain('CLI crashed');
+  });
+
+  it('should handle invalid JSON output', async () => {
+    const mockRunner = {
+      runnerType: 'opencode',
+      run: vi.fn().mockReturnValue({
+        outputs: [
+          { type: 'text', part: { text: 'This is not valid JSON' } }
+        ],
+        sessionId: 'judge-session-3'
+      }),
+      exportSession: vi.fn(),
+      listSessions: vi.fn()
+    };
+
+    vi.mocked(createRunner).mockReturnValue(mockRunner as any);
+
+    const assertion: JudgedByAssertion = {
+      judge: 'test-judge',
+      prompt: 'Evaluate'
+    };
+
+    const result = await verifyJudgedBy(
+      [],
+      assertion,
+      mockJudges,
+      defaultTimeout,
+      tempRoot
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.type).toBe('judged_by');
+    expect(result.message).toContain('No valid judge result');
+  });
+
+  it('should use assertion timeout over default timeout', async () => {
+    const mockRunner = {
+      runnerType: 'opencode',
+      run: vi.fn().mockReturnValue({
+        outputs: [
+          { type: 'text', part: { text: '{"passed":true,"reason":"OK"}' } }
+        ],
+        sessionId: 'judge-session-4'
+      }),
+      exportSession: vi.fn(),
+      listSessions: vi.fn()
+    };
+
+    vi.mocked(createRunner).mockReturnValue(mockRunner as any);
+
+    const assertion: JudgedByAssertion = {
+      judge: 'test-judge',
+      prompt: 'Test',
+      timeout: 60000 // Custom timeout
+    };
+
+    await verifyJudgedBy(
+      [],
+      assertion,
+      mockJudges,
+      defaultTimeout, // Default is 30000
+      tempRoot
+    );
+
+    // Verify the runner was called with the assertion timeout, not the default
+    expect(mockRunner.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        timeout: 60000
+      })
+    );
+  });
+
+  it('should use default timeout when assertion timeout not specified', async () => {
+    const mockRunner = {
+      runnerType: 'opencode',
+      run: vi.fn().mockReturnValue({
+        outputs: [
+          { type: 'text', part: { text: '{"passed":true,"reason":"OK"}' } }
+        ],
+        sessionId: 'judge-session-5'
+      }),
+      exportSession: vi.fn(),
+      listSessions: vi.fn()
+    };
+
+    vi.mocked(createRunner).mockReturnValue(mockRunner as any);
+
+    const assertion: JudgedByAssertion = {
+      judge: 'test-judge',
+      prompt: 'Test'
+      // No timeout specified
+    };
+
+    await verifyJudgedBy(
+      [],
+      assertion,
+      mockJudges,
+      defaultTimeout, // 30000
+      tempRoot
+    );
+
+    expect(mockRunner.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        timeout: 30000
+      })
+    );
+  });
+
+  it('should pass outputs to temp file and runner', async () => {
+    const mockRunner = {
+      runnerType: 'opencode',
+      run: vi.fn().mockReturnValue({
+        outputs: [
+          { type: 'text', part: { text: '{"passed":true,"reason":"OK"}' } }
+        ],
+        sessionId: 'judge-session-6'
+      }),
+      exportSession: vi.fn(),
+      listSessions: vi.fn()
+    };
+
+    vi.mocked(createRunner).mockReturnValue(mockRunner as any);
+
+    const outputs: OpenCodeRunOutput[] = [
+      { type: 'text', part: { text: 'Output 1' } },
+      { type: 'tool_use', part: { tool: 'write' } }
+    ];
+
+    const assertion: JudgedByAssertion = {
+      judge: 'test-judge',
+      prompt: 'Evaluate outputs'
+    };
+
+    await verifyJudgedBy(
+      outputs,
+      assertion,
+      mockJudges,
+      defaultTimeout,
+      tempRoot
+    );
+
+    // Verify run was called with file option
+    const runCall = mockRunner.run.mock.calls[0][0];
+    expect(runCall.file).toBeDefined();
+    expect(runCall.file).toContain('.judges');
+    expect(runCall.input).toContain('Evaluate outputs');
+    expect(runCall.input).toContain('{"passed":boolean');
+  });
+
+  it('should extract judge result from data.content (legacy format)', async () => {
+    const mockRunner = {
+      runnerType: 'opencode',
+      run: vi.fn().mockReturnValue({
+        outputs: [
+          { type: 'text', data: { content: '{"passed":true,"reason":"Legacy format works"}' } }
+        ],
+        sessionId: 'judge-session-7'
+      }),
+      exportSession: vi.fn(),
+      listSessions: vi.fn()
+    };
+
+    vi.mocked(createRunner).mockReturnValue(mockRunner as any);
+
+    const assertion: JudgedByAssertion = {
+      judge: 'test-judge',
+      prompt: 'Test'
+    };
+
+    const result = await verifyJudgedBy(
+      [],
+      assertion,
+      mockJudges,
+      defaultTimeout,
+      tempRoot
+    );
+
+    expect(result.passed).toBe(true);
+    expect(result.actual?.reason).toBe('Legacy format works');
+  });
+
+  it('should cleanup temp file after execution', async () => {
+    const mockRunner = {
+      runnerType: 'opencode',
+      run: vi.fn().mockReturnValue({
+        outputs: [
+          { type: 'text', part: { text: '{"passed":true,"reason":"OK"}' } }
+        ],
+        sessionId: 'judge-session-8'
+      }),
+      exportSession: vi.fn(),
+      listSessions: vi.fn()
+    };
+
+    vi.mocked(createRunner).mockReturnValue(mockRunner as any);
+
+    const assertion: JudgedByAssertion = {
+      judge: 'test-judge',
+      prompt: 'Test'
+    };
+
+    await verifyJudgedBy(
+      [],
+      assertion,
+      mockJudges,
+      defaultTimeout,
+      tempRoot
+    );
+
+    // Get the temp file path from the runner call
+    const runCall = mockRunner.run.mock.calls[0][0];
+    const tempFile = runCall.file;
+    const fileExists = await fs.pathExists(tempFile);
+    expect(fileExists).toBe(false);
+  });
+
+  it('should cleanup temp file even when execution fails', async () => {
+    const mockRunner = {
+      runnerType: 'opencode',
+      run: vi.fn().mockImplementation(() => {
+        throw new Error('Execution failed');
+      }),
+      exportSession: vi.fn(),
+      listSessions: vi.fn()
+    };
+
+    vi.mocked(createRunner).mockReturnValue(mockRunner as any);
+
+    const assertion: JudgedByAssertion = {
+      judge: 'test-judge',
+      prompt: 'Test'
+    };
+
+    await verifyJudgedBy(
+      [],
+      assertion,
+      mockJudges,
+      defaultTimeout,
+      tempRoot
+    );
+
+    // Get the temp file path from the runner call
+    const runCall = mockRunner.run.mock.calls[0][0];
+    const tempFile = runCall.file;
+    const fileExists = await fs.pathExists(tempFile);
+    expect(fileExists).toBe(false);
   });
 });

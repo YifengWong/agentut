@@ -324,7 +324,7 @@ export interface StepResult {
 
 export interface AssertionResult {
   type: string;
-  value: string | Matcher | ToolCallAssertion | FileContentAssertion | { file: string; text: string };
+  value: string | Matcher | ToolCallAssertion | FileContentAssertion | JudgedByAssertion | { file: string; text: string };
   passed: boolean;
   actual?: {
     tool?: string;
@@ -334,6 +334,7 @@ export interface AssertionResult {
     file?: string;
     files?: string[];
     responses?: string[];
+    reason?: string;  // AI裁判返回的原因
   };
   message?: string;
 }
