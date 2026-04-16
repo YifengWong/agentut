@@ -640,6 +640,253 @@ describe('Verifier', () => {
 
       expect(results).toHaveLength(0);
     });
+
+    it('should verify judged_by assertion with config', async () => {
+      const mockRunner = {
+        runnerType: 'opencode',
+        run: vi.fn().mockReturnValue({
+          outputs: [
+            { type: 'text', part: { text: '{"passed":true,"reason":"Quality check passed"}' } }
+          ],
+          sessionId: 'judge-session-1'
+        }),
+        exportSession: vi.fn(),
+        listSessions: vi.fn()
+      };
+
+      vi.mocked(createRunner).mockReturnValue(mockRunner as any);
+
+      const config = {
+        judges: {
+          'quality-judge': { runner: 'opencode', command: 'opencode' }
+        },
+        default_timeout: 60000
+      };
+
+      const outputs: OpenCodeRunOutput[] = [
+        { type: 'text', part: { text: 'Some output' } }
+      ];
+
+      const assertions: Assertion[] = [
+        { judged_by: { judge: 'quality-judge', prompt: 'Check quality' } }
+      ];
+
+      const results = await verifyAssertions(assertions, outputs, TEST_TEMP_DIR, config);
+
+      expect(results).toHaveLength(1);
+      expect(results[0].passed).toBe(true);
+      expect(results[0].type).toBe('judged_by');
+    });
+
+    it('should handle judged_by with missing judge config', async () => {
+      const config = {
+        judges: {},
+        default_timeout: 60000
+      };
+
+      const outputs: OpenCodeRunOutput[] = [
+        { type: 'text', part: { text: 'Some output' } }
+      ];
+
+      const assertions: Assertion[] = [
+        { judged_by: { judge: 'missing-judge', prompt: 'Check something' } }
+      ];
+
+      const results = await verifyAssertions(assertions, outputs, TEST_TEMP_DIR, config);
+
+      expect(results).toHaveLength(1);
+      expect(results[0].passed).toBe(false);
+      expect(results[0].message).toContain('not found');
+    });
+
+    it('should handle judged_by with empty judges config', async () => {
+      const config = {
+        judges: {}
+      };
+
+      const assertions: Assertion[] = [
+        { judged_by: { judge: 'any-judge', prompt: 'Test' } }
+      ];
+
+      const results = await verifyAssertions(assertions, [], TEST_TEMP_DIR, config);
+
+      expect(results).toHaveLength(1);
+      expect(results[0].passed).toBe(false);
+      expect(results[0].message).toContain('not found');
+    });
+
+    it('should use tempRoot for judged_by when provided', async () => {
+      const mockRunner = {
+        runnerType: 'opencode',
+        run: vi.fn().mockReturnValue({
+          outputs: [
+            { type: 'text', part: { text: '{"passed":true,"reason":"OK"}' } }
+          ],
+          sessionId: 'judge-session-2'
+        }),
+        exportSession: vi.fn(),
+        listSessions: vi.fn()
+      };
+
+      vi.mocked(createRunner).mockReturnValue(mockRunner as any);
+
+      const tempRootDir = path.join(TEST_TEMP_DIR, 'custom-temp');
+      await fs.ensureDir(tempRootDir);
+
+      const config = {
+        judges: {
+          'test-judge': { runner: 'opencode', command: 'opencode' }
+        }
+      };
+
+      const assertions: Assertion[] = [
+        { judged_by: { judge: 'test-judge', prompt: 'Test' } }
+      ];
+
+      await verifyAssertions(assertions, [], TEST_TEMP_DIR, config, tempRootDir);
+
+      // Verify temp file was created in tempRoot
+      const runCall = mockRunner.run.mock.calls[0][0];
+      expect(runCall.file).toContain('custom-temp');
+    });
+
+    it('should fall back to workDir when tempRoot not provided', async () => {
+      const mockRunner = {
+        runnerType: 'opencode',
+        run: vi.fn().mockReturnValue({
+          outputs: [
+            { type: 'text', part: { text: '{"passed":true,"reason":"OK"}' } }
+          ],
+          sessionId: 'judge-session-3'
+        }),
+        exportSession: vi.fn(),
+        listSessions: vi.fn()
+      };
+
+      vi.mocked(createRunner).mockReturnValue(mockRunner as any);
+
+      const workDir = path.join(TEST_TEMP_DIR, 'fallback-workdir');
+      await fs.ensureDir(workDir);
+
+      const config = {
+        judges: {
+          'test-judge': { runner: 'opencode', command: 'opencode' }
+        }
+      };
+
+      const assertions: Assertion[] = [
+        { judged_by: { judge: 'test-judge', prompt: 'Test' } }
+      ];
+
+      await verifyAssertions(assertions, [], workDir, config);
+
+      // Verify temp file was created in workDir (fallback)
+      const runCall = mockRunner.run.mock.calls[0][0];
+      expect(runCall.file).toContain('fallback-workdir');
+    });
+
+    it('should support mixed assertions with judged_by', async () => {
+      const mockRunner = {
+        runnerType: 'opencode',
+        run: vi.fn().mockReturnValue({
+          outputs: [
+            { type: 'text', part: { text: '{"passed":true,"reason":"All checks passed"}' } }
+          ],
+          sessionId: 'judge-session-4'
+        }),
+        exportSession: vi.fn(),
+        listSessions: vi.fn()
+      };
+
+      vi.mocked(createRunner).mockReturnValue(mockRunner as any);
+
+      const workDir = path.join(TEST_TEMP_DIR, 'mixed-workdir');
+      await fs.ensureDir(workDir);
+      await fs.writeFile(path.join(workDir, 'output.txt'), 'Hello World');
+
+      const config = {
+        judges: {
+          'output-judge': { runner: 'opencode', command: 'opencode' }
+        }
+      };
+
+      const outputs: OpenCodeRunOutput[] = [
+        { type: 'tool_call', data: { tool_name: 'Write' }, session_id: 'ses_1', timestamp: 1 },
+        { type: 'text', part: { text: 'Generated output' } }
+      ];
+
+      const assertions: Assertion[] = [
+        { should_call_tool: 'Write' },
+        { should_produce_file: 'output.txt' },
+        { judged_by: { judge: 'output-judge', prompt: 'Evaluate output quality' } }
+      ];
+
+      const results = await verifyAssertions(assertions, outputs, workDir, config);
+
+      expect(results).toHaveLength(3);
+      expect(results[0].passed).toBe(true); // should_call_tool
+      expect(results[0].type).toBe('should_call_tool');
+      expect(results[1].passed).toBe(true); // should_produce_file
+      expect(results[1].type).toBe('should_produce_file');
+      expect(results[2].passed).toBe(true); // judged_by
+      expect(results[2].type).toBe('judged_by');
+    });
+
+    it('should be backward compatible without config parameter', async () => {
+      const workDir = path.join(TEST_TEMP_DIR, 'backward-compat');
+      await fs.ensureDir(workDir);
+      await fs.writeFile(path.join(workDir, 'file.txt'), 'content');
+
+      const outputs: OpenCodeRunOutput[] = [
+        { type: 'tool_call', data: { tool_name: 'Read' }, session_id: 'ses_1', timestamp: 1 }
+      ];
+
+      const assertions: Assertion[] = [
+        { should_call_tool: 'Read' },
+        { should_produce_file: 'file.txt' }
+      ];
+
+      // Call without config parameter - should still work
+      const results = await verifyAssertions(assertions, outputs, workDir);
+
+      expect(results).toHaveLength(2);
+      expect(results.every(r => r.passed)).toBe(true);
+    });
+
+    it('should use default timeout from config for judged_by', async () => {
+      const mockRunner = {
+        runnerType: 'opencode',
+        run: vi.fn().mockReturnValue({
+          outputs: [
+            { type: 'text', part: { text: '{"passed":true,"reason":"OK"}' } }
+          ],
+          sessionId: 'judge-session-5'
+        }),
+        exportSession: vi.fn(),
+        listSessions: vi.fn()
+      };
+
+      vi.mocked(createRunner).mockReturnValue(mockRunner as any);
+
+      const config = {
+        judges: {
+          'timeout-judge': { runner: 'opencode', command: 'opencode' }
+        },
+        default_timeout: 90000
+      };
+
+      const assertions: Assertion[] = [
+        { judged_by: { judge: 'timeout-judge', prompt: 'Test' } }
+      ];
+
+      await verifyAssertions(assertions, [], TEST_TEMP_DIR, config);
+
+      expect(mockRunner.run).toHaveBeenCalledWith(
+        expect.objectContaining({
+          timeout: 90000
+        })
+      );
+    });
   });
 });
 

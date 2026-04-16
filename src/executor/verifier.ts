@@ -383,9 +383,13 @@ export function verifyResponseContains(
 export async function verifyAssertions(
   assertions: Assertion[],
   outputs: OpenCodeRunOutput[],
-  workDir: string
+  workDir: string,
+  config?: GlobalConfig,
+  tempRoot?: string
 ): Promise<AssertionResult[]> {
   const results: AssertionResult[] = [];
+  const judges = config?.judges || {};
+  const defaultTimeout = config?.default_timeout || 120000;
 
   for (const assertion of assertions) {
     if ('should_call_tool' in assertion) {
@@ -402,6 +406,17 @@ export async function verifyAssertions(
 
     if ('response_contains' in assertion) {
       results.push(verifyResponseContains(outputs, assertion.response_contains));
+    }
+
+    // judged_by 断言
+    if ('judged_by' in assertion) {
+      results.push(await verifyJudgedBy(
+        outputs,
+        assertion.judged_by,
+        judges,
+        defaultTimeout,
+        tempRoot || workDir
+      ));
     }
   }
 

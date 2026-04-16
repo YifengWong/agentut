@@ -9,7 +9,8 @@ const VALID_ASSERTION_TYPES = [
   'should_call_tool',
   'should_produce_file',
   'file_content_contains',
-  'response_contains'
+  'response_contains',
+  'judged_by'
 ];
 
 export function parseYaml(yamlString: string): YamlTestSuite {

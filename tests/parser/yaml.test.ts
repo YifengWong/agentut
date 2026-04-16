@@ -537,3 +537,101 @@ describe('validateYamlTestSuite runs and min_pass defaults', () => {
     expect(() => validateYamlTestSuite(suite)).toThrow(ValidationError);
   });
 });
+
+describe('judges config parsing', () => {
+  it('should parse judges config', async () => {
+    const yamlContent = `
+name: test-suite
+config:
+  judges:
+    code-reviewer:
+      runner: opencode
+      command: opencode
+    quality-checker:
+      runner: opencode
+      command: mycode
+scenarios:
+  - name: test
+    environment: default
+    cleanup: true
+    steps:
+      - input: "test"
+        expected: []
+environments:
+  default:
+    directory: ./test
+    setup: []
+`;
+
+    const result = parseAndValidateYaml(yamlContent);
+
+    expect(result.config?.judges).toBeDefined();
+    expect(result.config?.judges?.['code-reviewer']).toEqual({
+      runner: 'opencode',
+      command: 'opencode'
+    });
+    expect(result.config?.judges?.['quality-checker']).toEqual({
+      runner: 'opencode',
+      command: 'mycode'
+    });
+  });
+
+  it('should parse judged_by assertion', async () => {
+    const yamlContent = `
+name: test-suite
+scenarios:
+  - name: test
+    environment: default
+    cleanup: true
+    steps:
+      - input: "test"
+        expected:
+          - judged_by:
+              judge: code-reviewer
+              prompt: "Check quality"
+              timeout: 60000
+environments:
+  default:
+    directory: ./test
+    setup: []
+`;
+
+    const result = parseAndValidateYaml(yamlContent);
+
+    const assertion = result.scenarios[0].steps[0].expected[0];
+    expect('judged_by' in assertion).toBe(true);
+    if ('judged_by' in assertion) {
+      expect(assertion.judged_by.judge).toBe('code-reviewer');
+      expect(assertion.judged_by.prompt).toBe('Check quality');
+      expect(assertion.judged_by.timeout).toBe(60000);
+    }
+  });
+
+  it('should parse judged_by with min_pass', async () => {
+    const yamlContent = `
+name: test-suite
+scenarios:
+  - name: test
+    environment: default
+    cleanup: true
+    steps:
+      - input: "test"
+        expected:
+          - judged_by:
+              judge: reviewer
+              prompt: "Review"
+              min_pass: 4
+environments:
+  default:
+    directory: ./test
+    setup: []
+`;
+
+    const result = parseAndValidateYaml(yamlContent);
+
+    const assertion = result.scenarios[0].steps[0].expected[0];
+    if ('judged_by' in assertion) {
+      expect(assertion.judged_by.min_pass).toBe(4);
+    }
+  });
+});
