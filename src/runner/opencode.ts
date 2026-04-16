@@ -52,6 +52,11 @@ export class OpenCodeRunner implements AgentRunner {
       args.push('--fork');
     }
 
+    // Add -f flag for additional file (judge outputs)
+    if (options.file) {
+      args.push(`-f "${options.file}"`);
+    }
+
     // Always use JSON format
     args.push('--format json');
 

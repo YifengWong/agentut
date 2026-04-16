@@ -212,6 +212,20 @@ describe('OpenCodeRunner', () => {
         expect.any(Object)
       );
     });
+
+    it('should use -f flag when file option is specified', () => {
+      vi.mocked(execSync).mockReturnValue('{}');
+
+      runner.run({
+        input: 'Test',
+        file: '/path/to/outputs.json'
+      });
+
+      expect(execSync).toHaveBeenCalledWith(
+        expect.stringContaining('-f "/path/to/outputs.json"'),
+        expect.any(Object)
+      );
+    });
   });
 
   describe('exportSession', () => {
