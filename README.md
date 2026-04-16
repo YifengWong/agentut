@@ -121,6 +121,7 @@ agent 名称按以下优先级确定：
 | `should_produce_file` | 字符串：文件路径 | 验证产生了指定文件 |
 | `file_content_contains` | `{ file, text }` | 验证文件内容包含指定文本 |
 | `response_contains` | 字符串：文本 | 验证响应包含指定文本 |
+| `judged_by` | `{ judge, prompt, timeout?, min_pass? }` | AI裁判语义评判 |
 
 ### Matcher 模式（灵活匹配）
 
@@ -233,6 +234,102 @@ Matcher 模式的断言结果会包含实际值，便于调试：
   },
   "message": "Found matching tool call: skill(name matches regex '.*writing.*')"
 }
+```
+
+## AI裁判断言
+
+Agent UT 支持 AI裁判断言，允许用户指定一个 Agent CLI 来对测试结果进行语义级别的评判。
+
+### 全局裁判声明
+
+在 `config.judges` 中声明裁判配置：
+
+```yaml
+config:
+  judges:
+    code-reviewer:
+      runner: opencode
+      command: opencode    # 或企业封装名如 mycode
+      
+    quality-checker:
+      runner: opencode
+      command: mycode
+```
+
+### 断言级别使用
+
+```yaml
+expected:
+  - should_call_tool: Write
+  - judged_by:
+      judge: code-reviewer            # 引用全局声明的裁判名
+      prompt: "检查生成的代码是否符合项目规范"
+      timeout: 120000                 # 可选，复用 default_timeout 逻辑
+```
+
+### 裁判 CLI 输入输出格式
+
+裁判 CLI 接收：
+- **prompt**: 通过命令行参数传递（复用现有 input 机制）
+- **outputs**: 通过 `-f` 参数传入 outputs.json 文件路径
+
+裁判 CLI 返回 JSON 格式：
+```json
+{"passed": true, "reason": "代码质量良好"}
+```
+
+或失败时：
+```json
+{"passed": false, "reason": "缺少必要的文档注释"}
+```
+
+### 使用场景
+
+AI裁判断言适用于：
+- 代码质量评估（是否符合编码规范）
+- 文档完整性检查
+- 逻辑正确性验证（需要语义理解）
+- 输出风格一致性检查
+
+### 概率测试支持
+
+`judged_by` 断言支持 `min_pass` 配置：
+
+```yaml
+expected:
+  - judged_by:
+      judge: code-reviewer
+      prompt: "检查代码质量"
+      min_pass: 4  # 5次运行中至少4次通过
+```
+
+### 完整示例
+
+```yaml
+name: ai-judge-demo
+config:
+  judges:
+    reviewer:
+      runner: opencode
+      command: opencode
+
+environments:
+  default:
+    directory: ./fixtures/test-env
+    setup: []
+
+scenarios:
+  - name: code-generation-test
+    environment: default
+    cleanup: true
+    steps:
+      - input: "创建一个排序函数"
+        expected:
+          - should_call_tool: Write
+          - judged_by:
+              judge: reviewer
+              prompt: "检查函数是否正确处理边界情况，是否有适当的注释"
+              timeout: 60000
 ```
 
 ## 概率性测试
