@@ -254,7 +254,13 @@ async function executeScenario(
           sessionId = runResult.sessionId;
 
           // Verify assertions
-          const assertionResults = await verifyAssertions(step.expected, runResult.outputs, tempDirectory);
+          const assertionResults = await verifyAssertions(
+            step.expected,
+            runResult.outputs,
+            tempDirectory,
+            suite.config,  // 新增：传入全局配置
+            tempRoot       // 新增：传入临时目录根路径
+          );
 
           const stepPassed = assertionResults.every(a => a.passed);
           const stepDuration = Date.now() - stepStartTime;
