@@ -24,6 +24,7 @@ export interface RunOptions {
   timeout?: number;
   model?: string;
   agent?: string;
+  file?: string;  // -f 参数，传递附加文件路径（用于 AI Judge 断言）
 }
 
 /**

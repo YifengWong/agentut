@@ -37,6 +37,14 @@ describe('RunOptions interface', () => {
     expect(options.directory).toBe('/tmp/test');
     expect(options.sessionId).toBe('ses_123');
   });
+
+  it('should allow file field for judge CLI support', () => {
+    const options: RunOptions = {
+      input: 'Test',
+      file: '/path/to/outputs.json'
+    };
+    expect(options.file).toBe('/path/to/outputs.json');
+  });
 });
 
 describe('RunResult interface', () => {
