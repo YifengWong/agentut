@@ -11,6 +11,7 @@ import {
   type ScenarioConfig,
   type ToolCallAssertion,
   type FileContentAssertion,
+  type JudgedByAssertion,
   type StepResult,
   type ScenarioResult,
   type RunExecution,
@@ -97,6 +98,30 @@ describe('Assertion Type', () => {
     const assertion: Assertion = { response_contains: 'success' };
     expect('response_contains' in assertion).toBe(true);
   });
+
+  it('should allow judged_by assertion', () => {
+    const assertion: Assertion = {
+      judged_by: {
+        judge: 'code-reviewer',
+        prompt: 'Is this code well-structured?'
+      }
+    };
+    expect('judged_by' in assertion).toBe(true);
+  });
+
+  it('should allow judged_by assertion with optional fields', () => {
+    const assertion: Assertion = {
+      judged_by: {
+        judge: 'security-auditor',
+        prompt: 'Are there security vulnerabilities?',
+        timeout: 60000,
+        min_pass: 8
+      }
+    };
+    expect('judged_by' in assertion).toBe(true);
+    expect((assertion as { judged_by: JudgedByAssertion }).judged_by.timeout).toBe(60000);
+    expect((assertion as { judged_by: JudgedByAssertion }).judged_by.min_pass).toBe(8);
+  });
 });
 
 describe('AgentCliConfig type', () => {
@@ -164,6 +189,24 @@ describe('Probabilistic test types', () => {
       };
       expect(config.runs).toBeUndefined();
       expect(config.min_pass).toBeUndefined();
+    });
+
+    it('should accept judges configuration', () => {
+      const config: GlobalConfig = {
+        judges: {
+          'code-reviewer': {
+            runner: 'claude',
+            command: 'claude'
+          },
+          'security-auditor': {
+            runner: 'gemini',
+            command: 'gemini'
+          }
+        }
+      };
+      expect(config.judges).toBeDefined();
+      expect(config.judges!['code-reviewer'].runner).toBe('claude');
+      expect(config.judges!['security-auditor'].runner).toBe('gemini');
     });
   });
 
@@ -338,6 +381,30 @@ describe('Probabilistic test types', () => {
       };
       expect(run.steps).toHaveLength(1);
       expect(run.steps[0].step_index).toBe(0);
+    });
+  });
+
+  describe('JudgedByAssertion type', () => {
+    it('should require judge and prompt fields', () => {
+      const assertion: JudgedByAssertion = {
+        judge: 'code-reviewer',
+        prompt: 'Is this code well-structured?'
+      };
+      expect(assertion.judge).toBe('code-reviewer');
+      expect(assertion.prompt).toBe('Is this code well-structured?');
+      expect(assertion.timeout).toBeUndefined();
+      expect(assertion.min_pass).toBeUndefined();
+    });
+
+    it('should allow optional timeout and min_pass', () => {
+      const assertion: JudgedByAssertion = {
+        judge: 'security-auditor',
+        prompt: 'Check for vulnerabilities',
+        timeout: 30000,
+        min_pass: 9
+      };
+      expect(assertion.timeout).toBe(30000);
+      expect(assertion.min_pass).toBe(9);
     });
   });
 });

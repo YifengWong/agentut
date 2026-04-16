@@ -70,11 +70,22 @@ export interface FileContentAssertion {
   min_pass?: number;  // 概率测试：覆盖场景/全局设置
 }
 
+/**
+ * AI裁判断言配置
+ */
+export interface JudgedByAssertion {
+  judge: string;       // 引用全局 judges 中的裁判名
+  prompt: string;      // 给裁判的输入提示
+  timeout?: number;    // 可选超时覆盖
+  min_pass?: number;   // 概率测试支持
+}
+
 export type Assertion =
   | { should_call_tool: string | ToolCallAssertion }
   | { should_produce_file: string | Matcher }
   | { file_content_contains: { file: string; text: string } | FileContentAssertion }
-  | { response_contains: string | Matcher };
+  | { response_contains: string | Matcher }
+  | { judged_by: JudgedByAssertion };  // AI裁判断言
 
 // ========== Agent CLI Configuration ==========
 
@@ -92,6 +103,7 @@ export interface GlobalConfig {
   agent_cli?: AgentCliConfig;  // 新增：Agent CLI 配置
   runs?: number;                // 概率测试：运行次数
   min_pass?: number;            // 概率测试：最小通过次数
+  judges?: Record<string, AgentCliConfig>;  // AI裁判配置
   /** @deprecated Use environment.agent and setup.copy with $WORKDIR instead */
   target?: {
     skill?: string;
