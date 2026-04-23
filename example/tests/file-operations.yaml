@@ -31,6 +31,9 @@ scenarios:
           - file_content_contains:
               file: hello.txt
               text: "Hello World"
+          - judged_by:
+              judge: simple-judge
+              prompt: "检查是否成功创建了 hello.txt 文件，且内容包含 'Hello World'"
 
   # 场景 2：读取文件（验证 Read + 响应内容）
   - name: read-file
@@ -68,8 +71,14 @@ scenarios:
           - response_contains: "Test Content"
 
 config:
+  runs: 1
+  min_pass: 1
   agent_cli:
     runner: opencode      # Agent 类型 (opencode, claude, gemini)
     command: opencode       # 实际执行的 CLI 命令名
-  default_timeout: 120000
+  judges:
+    simple-judge:
+      runner: opencode
+      command: opencode
+  default_timeout: 300000
   parallel: false
