@@ -255,7 +255,7 @@ export interface AssertionFailure {
  */
 export interface AssertionStat {
   type: string;
-  value: string | Matcher | ToolCallAssertion | FileContentAssertion | { file: string; text: string };
+  value: string | Matcher | ToolCallAssertion | FileContentAssertion | JudgedByAssertion | { file: string; text: string };
   passed_runs: number;
   total_runs: number;
   pass_rate: number;  // 百分比，0-100
@@ -301,7 +301,7 @@ export interface StepSummary {
  */
 export interface AssertionSummary {
   type: string;
-  value: string | Matcher | ToolCallAssertion | FileContentAssertion | { file: string; text: string };
+  value: string | Matcher | ToolCallAssertion | FileContentAssertion | JudgedByAssertion | { file: string; text: string };
   min_pass: number;
   passed_runs: number;
   status: 'passed' | 'failed';

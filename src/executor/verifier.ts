@@ -435,18 +435,53 @@ Where:
 
 /**
  * 从裁判输出中提取 JSON 结果
+ * 支持多种格式：
+ * 1. 纯 JSON 文本
+ * 2. JSON 嵌入在其他文本中（使用正则提取）
  */
 function extractJudgeResult(outputs: OpenCodeRunOutput[]): { passed: boolean; reason?: string } {
   for (const output of outputs) {
     if (output.type === 'text') {
       const text = output.part?.text || output.data?.content || '';
+      const trimmedText = text.trim();
+
+      // 尝试直接解析纯 JSON
       try {
-        const parsed = JSON.parse(text.trim());
+        const parsed = JSON.parse(trimmedText);
         if (typeof parsed.passed === 'boolean') {
           return parsed;
         }
       } catch {
-        // Non-JSON, continue searching
+        // 不是纯 JSON，继续尝试其他方式
+      }
+
+      // 尝试从文本中提取 JSON 对象（使用正则）
+      // 匹配 {"passed": boolean, "reason": string} 格式
+      const jsonRegex = /\{[^{}]*"passed"\s*:\s*(true|false)[^{}]*"reason"\s*:\s*"[^"]*"[^{}]*\}/i;
+      const match = trimmedText.match(jsonRegex);
+      if (match) {
+        try {
+          const parsed = JSON.parse(match[0]);
+          if (typeof parsed.passed === 'boolean') {
+            return parsed;
+          }
+        } catch {
+          // 正则匹配的内容不是有效 JSON
+        }
+      }
+
+      // 尝试更宽松的正则：寻找任何包含 passed 字段的 JSON
+      const looseJsonRegex = /\{[^{}]*"passed"\s*:\s*(true|false)[^{}]*\}/i;
+      const looseMatch = trimmedText.match(looseJsonRegex);
+      if (looseMatch) {
+        try {
+          const parsed = JSON.parse(looseMatch[0]);
+          if (typeof parsed.passed === 'boolean') {
+            return parsed;
+          }
+        } catch {
+          // 仍然解析失败
+        }
       }
     }
   }
@@ -500,7 +535,7 @@ export async function verifyJudgedBy(
   try {
     const result = runner.run({
       input: combinedPrompt,
-      file: tempFile,
+      // file: tempFile,
       timeout
     });
 

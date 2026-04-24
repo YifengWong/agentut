@@ -7,6 +7,7 @@ import type {
   Matcher,
   ToolCallAssertion,
   FileContentAssertion,
+  JudgedByAssertion,
   RunExecution,
   AssertionStat
 } from '../types/index.js';
@@ -49,17 +50,19 @@ function getAssertionType(assertion: Assertion): string {
   if ('should_produce_file' in assertion) return 'should_produce_file';
   if ('file_content_contains' in assertion) return 'file_content_contains';
   if ('response_contains' in assertion) return 'response_contains';
+  if ('judged_by' in assertion) return 'judged_by';
   return 'unknown';
 }
 
 /**
  * 从 Assertion 提取值
  */
-function getAssertionValue(assertion: Assertion): string | Matcher | ToolCallAssertion | FileContentAssertion | { file: string; text: string } | undefined {
+function getAssertionValue(assertion: Assertion): string | Matcher | ToolCallAssertion | FileContentAssertion | JudgedByAssertion | { file: string; text: string } | undefined {
   if ('should_call_tool' in assertion) return assertion.should_call_tool as string | ToolCallAssertion;
   if ('should_produce_file' in assertion) return assertion.should_produce_file as string | Matcher;
   if ('file_content_contains' in assertion) return assertion.file_content_contains as FileContentAssertion | { file: string; text: string };
   if ('response_contains' in assertion) return assertion.response_contains as string | Matcher;
+  if ('judged_by' in assertion) return assertion.judged_by as JudgedByAssertion;
   return undefined;
 }
 

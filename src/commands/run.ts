@@ -346,10 +346,8 @@ async function executeScenario(
   let finalStatus: 'passed' | 'failed';
   const allAssertions = scenario.steps.flatMap(step => step.expected);
 
-  // 计算断言统计
-  const assertionStats = effectiveRuns > 1
-    ? calculateAssertionStats(allRunExecutions, allAssertions, effectiveMinPass)
-    : undefined;
+  // 计算断言统计（单次和多次运行都生成）
+  const assertionStats = calculateAssertionStats(allRunExecutions, allAssertions, effectiveMinPass);
 
   // 构建步骤结果（从运行详情中提取）
   const stepResults: StepResult[] = scenario.steps.map((stepConfig, stepIndex) => {
