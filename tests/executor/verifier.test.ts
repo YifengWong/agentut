@@ -745,9 +745,9 @@ describe('Verifier', () => {
 
       await verifyAssertions(assertions, [], TEST_TEMP_DIR, config, tempRootDir);
 
-      // Verify temp file was created in tempRoot
+      // Verify runner runs in workDir (TEST_TEMP_DIR acts as tempDirectory)
       const runCall = mockRunner.run.mock.calls[0][0];
-      expect(runCall.file).toContain('custom-temp');
+      expect(runCall.directory).toBe(TEST_TEMP_DIR);
     });
 
     it('should fall back to workDir when tempRoot not provided', async () => {
@@ -780,9 +780,9 @@ describe('Verifier', () => {
 
       await verifyAssertions(assertions, [], workDir, config);
 
-      // Verify temp file was created in workDir (fallback)
+      // Verify runner runs in workDir (fallback: workDir is both tempDirectory and tempRoot)
       const runCall = mockRunner.run.mock.calls[0][0];
-      expect(runCall.file).toContain('fallback-workdir');
+      expect(runCall.directory).toBe(workDir);
     });
 
     it('should support mixed assertions with judged_by', async () => {
@@ -913,7 +913,8 @@ describe('verifyJudgedBy', () => {
       assertion,
       mockJudges,
       defaultTimeout,
-      tempRoot
+      tempRoot,
+      tempRoot  // judgeDir
     );
 
     expect(result.passed).toBe(false);
@@ -951,7 +952,8 @@ describe('verifyJudgedBy', () => {
       assertion,
       mockJudges,
       defaultTimeout,
-      tempRoot
+      tempRoot,
+      tempRoot  // judgeDir
     );
 
     expect(result.passed).toBe(true);
@@ -986,7 +988,8 @@ describe('verifyJudgedBy', () => {
       assertion,
       mockJudges,
       defaultTimeout,
-      tempRoot
+      tempRoot,
+      tempRoot  // judgeDir
     );
 
     expect(result.passed).toBe(false);
@@ -1018,7 +1021,8 @@ describe('verifyJudgedBy', () => {
       assertion,
       mockJudges,
       defaultTimeout,
-      tempRoot
+      tempRoot,
+      tempRoot  // judgeDir
     );
 
     expect(result.passed).toBe(false);
@@ -1052,7 +1056,8 @@ describe('verifyJudgedBy', () => {
       assertion,
       mockJudges,
       defaultTimeout,
-      tempRoot
+      tempRoot,
+      tempRoot  // judgeDir
     );
 
     expect(result.passed).toBe(false);
@@ -1086,7 +1091,8 @@ describe('verifyJudgedBy', () => {
       assertion,
       mockJudges,
       defaultTimeout, // Default is 30000
-      tempRoot
+      tempRoot,
+      tempRoot  // judgeDir
     );
 
     // Verify the runner was called with the assertion timeout, not the default
@@ -1163,13 +1169,13 @@ describe('verifyJudgedBy', () => {
       assertion,
       mockJudges,
       defaultTimeout,
-      tempRoot
+      tempRoot,
+      tempRoot  // judgeDir - AI裁判运行目录
     );
 
-    // Verify run was called with file option
+    // Verify run was called with directory option (runs in tempDirectory)
     const runCall = mockRunner.run.mock.calls[0][0];
-    expect(runCall.file).toBeDefined();
-    expect(runCall.file).toContain('.judges');
+    expect(runCall.directory).toBe(tempRoot);
     expect(runCall.input).toContain('Evaluate outputs');
     expect(runCall.input).toContain('{"passed":boolean');
   });
@@ -1199,7 +1205,8 @@ describe('verifyJudgedBy', () => {
       assertion,
       mockJudges,
       defaultTimeout,
-      tempRoot
+      tempRoot,
+      tempRoot  // judgeDir
     );
 
     expect(result.passed).toBe(true);

@@ -415,7 +415,8 @@ export async function verifyAssertions(
         assertion.judged_by,
         judges,
         defaultTimeout,
-        tempRoot || workDir
+        tempRoot || workDir,
+        workDir  // AI裁判运行目录：使用场景临时目录
       ));
     }
   }
@@ -491,13 +492,20 @@ function extractJudgeResult(outputs: OpenCodeRunOutput[]): { passed: boolean; re
 
 /**
  * AI裁判断言验证
+ * @param outputs Agent输出数据
+ * @param assertion judged_by断言配置
+ * @param judges 裁判配置表
+ * @param defaultTimeout 默认超时时间
+ * @param tempRoot 临时文件根目录（用于存放临时JSON文件）
+ * @param judgeDir AI裁判运行目录（通常是场景临时目录tempDirectory）
  */
 export async function verifyJudgedBy(
   outputs: OpenCodeRunOutput[],
   assertion: JudgedByAssertion,
   judges: Record<string, AgentCliConfig>,
   defaultTimeout: number,
-  tempRoot: string
+  tempRoot: string,
+  judgeDir: string
 ): Promise<AssertionResult> {
   const judgeName = assertion.judge;
 
@@ -535,7 +543,7 @@ export async function verifyJudgedBy(
   try {
     const result = runner.run({
       input: combinedPrompt,
-      // file: tempFile,
+      directory: judgeDir,  // AI裁判运行在场景临时目录
       timeout
     });
 
