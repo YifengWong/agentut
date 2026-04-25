@@ -129,6 +129,22 @@ export function validateYamlTestSuite(suite: YamlTestSuite): void {
       }
     }
 
+    // 验证 initial_session（可选）
+    if (scenario.initial_session !== undefined) {
+      if (typeof scenario.initial_session !== 'string') {
+        throw new ValidationError(
+          `Scenario "${scenario.name}": initial_session must be a string`,
+          `scenarios.${scenario.name}.initial_session`
+        );
+      }
+      if (scenario.initial_session.trim() === '') {
+        throw new ValidationError(
+          `Scenario "${scenario.name}": initial_session cannot be empty`,
+          `scenarios.${scenario.name}.initial_session`
+        );
+      }
+    }
+
     // Validate assertions in steps
     for (const step of scenario.steps) {
       for (const assertion of step.expected) {

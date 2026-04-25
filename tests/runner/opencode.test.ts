@@ -310,4 +310,66 @@ ses_def456                      Another Session                         09:00`;
       expect(result).toHaveLength(0);
     });
   });
+
+  describe('importSession', () => {
+    it('should call CLI import with session file', async () => {
+      vi.mocked(execSync).mockReturnValue('Imported session: ses_abc123\n');
+
+      const result = await runner.importSession('/path/to/session.json');
+
+      expect(execSync).toHaveBeenCalledWith(
+        expect.stringContaining('opencode import "/path/to/session.json"'),
+        expect.any(Object)
+      );
+      expect(result).toBe('ses_abc123');
+    });
+
+    it('should use custom command name', async () => {
+      const customRunner = new OpenCodeRunner('mycode');
+      vi.mocked(execSync).mockReturnValue('Imported session: ses_xyz\n');
+
+      await customRunner.importSession('/path/to/session.json');
+
+      expect(execSync).toHaveBeenCalledWith(
+        expect.stringContaining('mycode import'),
+        expect.any(Object)
+      );
+    });
+
+    it('should parse session ID from output format', async () => {
+      vi.mocked(execSync).mockReturnValue('Imported session: ses_123abc\n');
+
+      const result = await runner.importSession('/path/to/session.json');
+
+      expect(result).toBe('ses_123abc');
+    });
+
+    it('should handle session ID without ses_ prefix', async () => {
+      vi.mocked(execSync).mockReturnValue('Imported session: abc123xyz\n');
+
+      const result = await runner.importSession('/path/to/session.json');
+
+      expect(result).toBe('abc123xyz');
+    });
+
+    it('should throw ExecutionError when import fails', async () => {
+      vi.mocked(execSync).mockImplementation(() => {
+        throw new Error('Import failed');
+      });
+
+      await expect(runner.importSession('/path/to/session.json')).rejects.toThrow(ExecutionError);
+    });
+
+    it('should throw ExecutionError when output format is invalid', async () => {
+      vi.mocked(execSync).mockReturnValue('Invalid output format\n');
+
+      await expect(runner.importSession('/path/to/session.json')).rejects.toThrow(ExecutionError);
+    });
+
+    it('should throw ExecutionError when output does not start with Imported session:', async () => {
+      vi.mocked(execSync).mockReturnValue('ses_abc123\n');
+
+      await expect(runner.importSession('/path/to/session.json')).rejects.toThrow(ExecutionError);
+    });
+  });
 });

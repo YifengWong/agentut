@@ -118,6 +118,13 @@ class Logger {
   }
 
   /**
+   * 导入 session
+   */
+  importSession(sessionFile: string): void {
+    console.log(`  Importing session: ${sessionFile}`);
+  }
+
+  /**
    * 错误输出
    */
   error(scenarioName: string, message: string): void {

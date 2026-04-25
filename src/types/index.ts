@@ -27,6 +27,7 @@ export interface ScenarioConfig {
   steps: StepConfig[];
   runs?: number;      // 概率测试：覆盖全局设置
   min_pass?: number;  // 概率测试：覆盖全局设置
+  initial_session?: string;  // session 文件路径（相对于 YAML 文件所在目录）
 }
 
 export interface StepConfig {

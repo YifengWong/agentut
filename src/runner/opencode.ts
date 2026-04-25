@@ -194,4 +194,43 @@ export class OpenCodeRunner implements AgentRunner {
       return [];
     }
   }
+
+  /**
+   * 导入会话文件
+   *
+   * @param sessionFile - session 文件的绝对路径
+   * @returns 导入后的 session ID
+   * @throws ExecutionError 当导入失败时
+   */
+  async importSession(sessionFile: string): Promise<string> {
+    const fullCommand = `${this.command} import "${sessionFile}"`;
+
+    try {
+      const output = execSync(fullCommand, {
+        encoding: 'utf-8',
+        timeout: 30000
+      });
+
+      // opencode import 输出格式: "Imported session: xxx"
+      const match = output.trim().match(/Imported session:\s*(\S+)/);
+      if (!match) {
+        throw new ExecutionError(
+          `Failed to parse session ID from import output: ${output}`,
+          fullCommand
+        );
+      }
+      return match[1];
+    } catch (error) {
+      if (error instanceof ExecutionError) {
+        throw error;
+      }
+      if (error instanceof Error) {
+        throw new ExecutionError(
+          `Failed to import session from ${sessionFile}: ${error.message}`,
+          fullCommand
+        );
+      }
+      throw new ExecutionError(`Failed to import session from ${sessionFile}`, fullCommand);
+    }
+  }
 }

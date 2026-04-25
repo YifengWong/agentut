@@ -635,3 +635,109 @@ environments:
     }
   });
 });
+
+describe('validateYamlTestSuite initial_session', () => {
+  it('should accept valid initial_session string', () => {
+    const suite: YamlTestSuite = {
+      name: 'test',
+      environments: {
+        default: { directory: './test', setup: [] }
+      },
+      scenarios: [{
+        name: 'scenario-1',
+        environment: 'default',
+        cleanup: true,
+        steps: [],
+        initial_session: '.agentut/sessions/base.json'
+      }]
+    };
+    expect(() => validateYamlTestSuite(suite)).not.toThrow();
+  });
+
+  it('should accept scenario without initial_session', () => {
+    const suite: YamlTestSuite = {
+      name: 'test',
+      environments: {
+        default: { directory: './test', setup: [] }
+      },
+      scenarios: [{
+        name: 'scenario-1',
+        environment: 'default',
+        cleanup: true,
+        steps: []
+      }]
+    };
+    expect(() => validateYamlTestSuite(suite)).not.toThrow();
+  });
+
+  it('should throw ValidationError for non-string initial_session', () => {
+    const suite: YamlTestSuite = {
+      name: 'test',
+      environments: {
+        default: { directory: './test', setup: [] }
+      },
+      scenarios: [{
+        name: 'scenario-1',
+        environment: 'default',
+        cleanup: true,
+        steps: [],
+        initial_session: 123 as unknown as string
+      }]
+    };
+    expect(() => validateYamlTestSuite(suite)).toThrow(ValidationError);
+  });
+
+  it('should throw ValidationError for empty initial_session', () => {
+    const suite: YamlTestSuite = {
+      name: 'test',
+      environments: {
+        default: { directory: './test', setup: [] }
+      },
+      scenarios: [{
+        name: 'scenario-1',
+        environment: 'default',
+        cleanup: true,
+        steps: [],
+        initial_session: ''
+      }]
+    };
+    expect(() => validateYamlTestSuite(suite)).toThrow(ValidationError);
+  });
+
+  it('should throw ValidationError for whitespace-only initial_session', () => {
+    const suite: YamlTestSuite = {
+      name: 'test',
+      environments: {
+        default: { directory: './test', setup: [] }
+      },
+      scenarios: [{
+        name: 'scenario-1',
+        environment: 'default',
+        cleanup: true,
+        steps: [],
+        initial_session: '   '
+      }]
+    };
+    expect(() => validateYamlTestSuite(suite)).toThrow(ValidationError);
+  });
+});
+
+describe('parseYaml initial_session', () => {
+  it('should parse initial_session from YAML', () => {
+    const yaml = `
+name: test-suite
+environments:
+  default:
+    directory: ./test
+    setup: []
+scenarios:
+  - name: scenario-1
+    environment: default
+    cleanup: true
+    initial_session: .agentut/sessions/base.json
+    steps: []
+`;
+    const result = parseYaml(yaml);
+    expect(result.scenarios[0].initial_session).toBe('.agentut/sessions/base.json');
+  });
+});

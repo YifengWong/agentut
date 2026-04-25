@@ -219,6 +219,19 @@ async function executeScenario(
       });
       tempDirectory = envResult.tempDirectory;
 
+      // 导入 initial_session（如果有配置）
+      if (scenario.initial_session) {
+        const sessionFilePath = path.resolve(yamlDirectory, scenario.initial_session);
+        if (!await fs.pathExists(sessionFilePath)) {
+          throw new ExecutionError(
+            `Session file not found: ${scenario.initial_session}`,
+            sessionFilePath
+          );
+        }
+        logger.importSession(scenario.initial_session);
+        sessionId = await runner.importSession(sessionFilePath);
+      }
+
       // Execute steps
       const totalSteps = scenario.steps.length;
       const runStepDetails: RunStepDetail[] = [];
