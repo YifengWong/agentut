@@ -1,0 +1,249 @@
+{
+  "info": {
+    "id": "ses_23d283b86ffe1RccNmmDK65z1D",
+    "slug": "proud-comet",
+    "projectID": "9bb128d43ce30ac60bc43d5d12774efa967f0694",
+    "directory": "D:\\Projects\\agentvcr",
+    "title": "打招呼",
+    "version": "1.2.25",
+    "summary": {
+      "additions": 37,
+      "deletions": 0,
+      "files": 1
+    },
+    "time": {
+      "created": 1777090413689,
+      "updated": 1777090433886
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1777090413712
+        },
+        "summary": {
+          "diffs": []
+        },
+        "agent": "build",
+        "model": {
+          "providerID": "bailian-coding-plan",
+          "modelID": "MiniMax-M2.5"
+        },
+        "id": "msg_dc2d7c47f001PxeKV0h55l3Qjb",
+        "sessionID": "ses_23d283b86ffe1RccNmmDK65z1D"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "你好",
+          "id": "prt_dc2d7c47f002QAkE6C1Fh2CWyB",
+          "sessionID": "ses_23d283b86ffe1RccNmmDK65z1D",
+          "messageID": "msg_dc2d7c47f001PxeKV0h55l3Qjb"
+        }
+      ]
+    },
+    {
+      "info": {
+        "role": "assistant",
+        "time": {
+          "created": 1777090413742,
+          "completed": 1777090418813
+        },
+        "parentID": "msg_dc2d7c47f001PxeKV0h55l3Qjb",
+        "modelID": "MiniMax-M2.5",
+        "providerID": "bailian-coding-plan",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "D:\\Projects\\agentvcr",
+          "root": "D:\\Projects\\agentvcr"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 16146,
+          "input": 16100,
+          "output": 42,
+          "reasoning": 0,
+          "cache": {
+            "read": 4,
+            "write": 0
+          }
+        },
+        "finish": "stop",
+        "id": "msg_dc2d7c4ae001tKdfZboK4uS7Q3",
+        "sessionID": "ses_23d283b86ffe1RccNmmDK65z1D"
+      },
+      "parts": [
+        {
+          "type": "step-start",
+          "snapshot": "c6686733b9c715e420f8994d0985d1bff0e28f04",
+          "id": "prt_dc2d7d56c001dpOSE0f6VWn25t",
+          "sessionID": "ses_23d283b86ffe1RccNmmDK65z1D",
+          "messageID": "msg_dc2d7c4ae001tKdfZboK4uS7Q3"
+        },
+        {
+          "type": "reasoning",
+          "text": "用户用中文说\"你好\"，这是一个简单的问候。根据指示，我应该用中文回复，并且保持简洁。我不需要使用任何工具，只需要简单回应即可。",
+          "metadata": {
+            "anthropic": {
+              "signature": ""
+            }
+          },
+          "time": {
+            "start": 1777090418030,
+            "end": 1777090418172
+          },
+          "id": "prt_dc2d7d56e001BPUWvjVW0B0VW0",
+          "sessionID": "ses_23d283b86ffe1RccNmmDK65z1D",
+          "messageID": "msg_dc2d7c4ae001tKdfZboK4uS7Q3"
+        },
+        {
+          "type": "text",
+          "text": "你好！有什么可以帮你的吗？",
+          "time": {
+            "start": 1777090418283,
+            "end": 1777090418283
+          },
+          "id": "prt_dc2d7d5fe001vO2chQhQMRol0a",
+          "sessionID": "ses_23d283b86ffe1RccNmmDK65z1D",
+          "messageID": "msg_dc2d7c4ae001tKdfZboK4uS7Q3"
+        },
+        {
+          "type": "step-finish",
+          "reason": "stop",
+          "snapshot": "c6686733b9c715e420f8994d0985d1bff0e28f04",
+          "cost": 0,
+          "tokens": {
+            "total": 16146,
+            "input": 16100,
+            "output": 42,
+            "reasoning": 0,
+            "cache": {
+              "read": 4,
+              "write": 0
+            }
+          },
+          "id": "prt_dc2d7d66f001Pa1gl4DEZQ3Wi7",
+          "sessionID": "ses_23d283b86ffe1RccNmmDK65z1D",
+          "messageID": "msg_dc2d7c4ae001tKdfZboK4uS7Q3"
+        }
+      ]
+    },
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1777090422482
+        },
+        "summary": {
+          "diffs": []
+        },
+        "agent": "build",
+        "model": {
+          "providerID": "bailian-coding-plan",
+          "modelID": "MiniMax-M2.5"
+        },
+        "id": "msg_dc2d7e6ba001R09d8tPBF7Q6l3",
+        "sessionID": "ses_23d283b86ffe1RccNmmDK65z1D"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "你是谁？",
+          "id": "prt_dc2d7e6ba002hnMfMP1unOTwZJ",
+          "sessionID": "ses_23d283b86ffe1RccNmmDK65z1D",
+          "messageID": "msg_dc2d7e6ba001R09d8tPBF7Q6l3"
+        }
+      ]
+    },
+    {
+      "info": {
+        "role": "assistant",
+        "time": {
+          "created": 1777090422490,
+          "completed": 1777090433572
+        },
+        "parentID": "msg_dc2d7e6ba001R09d8tPBF7Q6l3",
+        "modelID": "MiniMax-M2.5",
+        "providerID": "bailian-coding-plan",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "D:\\Projects\\agentvcr",
+          "root": "D:\\Projects\\agentvcr"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 16187,
+          "input": 25,
+          "output": 62,
+          "reasoning": 0,
+          "cache": {
+            "read": 16100,
+            "write": 0
+          }
+        },
+        "finish": "stop",
+        "id": "msg_dc2d7e6da001ylROx5xy5W5vMP",
+        "sessionID": "ses_23d283b86ffe1RccNmmDK65z1D"
+      },
+      "parts": [
+        {
+          "type": "step-start",
+          "snapshot": "510a76fd8d0cb661aa00e168d90c48ab97e3f94f",
+          "id": "prt_dc2d80d87001X5y09XjV5TM7qV",
+          "sessionID": "ses_23d283b86ffe1RccNmmDK65z1D",
+          "messageID": "msg_dc2d7e6da001ylROx5xy5W5vMP"
+        },
+        {
+          "type": "reasoning",
+          "text": "用户问我是谁。根据系统提示，我是 opencode，一个交互式 CLI 工具，帮助用户完成软件工程任务。我应该简洁回答。",
+          "metadata": {
+            "anthropic": {
+              "signature": ""
+            }
+          },
+          "time": {
+            "start": 1777090432392,
+            "end": 1777090432939
+          },
+          "id": "prt_dc2d80d880010UF6m5Ew2mebDk",
+          "sessionID": "ses_23d283b86ffe1RccNmmDK65z1D",
+          "messageID": "msg_dc2d7e6da001ylROx5xy5W5vMP"
+        },
+        {
+          "type": "text",
+          "text": "我是 opencode，一个交互式 CLI 工具，帮助你完成软件工程任务，比如编写代码、调试、搜索文件等。\n\n有什么我可以帮你的吗？",
+          "time": {
+            "start": 1777090433110,
+            "end": 1777090433110
+          },
+          "id": "prt_dc2d80fac001MYIdMMFq5THZ5d",
+          "sessionID": "ses_23d283b86ffe1RccNmmDK65z1D",
+          "messageID": "msg_dc2d7e6da001ylROx5xy5W5vMP"
+        },
+        {
+          "type": "step-finish",
+          "reason": "stop",
+          "snapshot": "510a76fd8d0cb661aa00e168d90c48ab97e3f94f",
+          "cost": 0,
+          "tokens": {
+            "total": 16187,
+            "input": 25,
+            "output": 62,
+            "reasoning": 0,
+            "cache": {
+              "read": 16100,
+              "write": 0
+            }
+          },
+          "id": "prt_dc2d81059001pcCctnhovpIdjC",
+          "sessionID": "ses_23d283b86ffe1RccNmmDK65z1D",
+          "messageID": "msg_dc2d7e6da001ylROx5xy5W5vMP"
+        }
+      ]
+    }
+  ]
+}

@@ -17,7 +17,7 @@ scenarios:
   # 场景 1：创建文件（验证 Write + 文件产生）
   - name: create-file
     environment: empty
-    cleanup: true
+    initial_session: ".agentut/my_test_init_session.json"
     steps:
       - input: "使用 'file-operations' 技能，创建 hello.txt 文件，内容为 'Hello World'。"
         expected:
