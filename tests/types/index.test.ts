@@ -149,6 +149,45 @@ describe('AgentCliConfig type', () => {
     };
     expect(config.runner).toBe('gemini');
   });
+
+  it('should allow optional model field', () => {
+    const config: AgentCliConfig = {
+      runner: 'opencode',
+      command: 'opencode',
+      model: 'anthropic/claude-3.5-sonnet'
+    };
+    expect(config.model).toBe('anthropic/claude-3.5-sonnet');
+  });
+
+  it('should allow optional agent field', () => {
+    const config: AgentCliConfig = {
+      runner: 'opencode',
+      command: 'opencode',
+      agent: 'my-custom-agent'
+    };
+    expect(config.agent).toBe('my-custom-agent');
+  });
+
+  it('should allow both model and agent fields', () => {
+    const config: AgentCliConfig = {
+      runner: 'opencode',
+      command: 'opencode',
+      model: 'openai/gpt-4o',
+      agent: 'judge-agent'
+    };
+    expect(config.model).toBe('openai/gpt-4o');
+    expect(config.agent).toBe('judge-agent');
+  });
+
+  it('should allow model with special characters (slash and dot)', () => {
+    const config: AgentCliConfig = {
+      runner: 'opencode',
+      command: 'opencode',
+      model: 'anthropic/claude-3.5-sonnet-20240620'
+    };
+    expect(config.model).toContain('/');
+    expect(config.model).toContain('.');
+  });
 });
 
 describe('SessionInfo type', () => {

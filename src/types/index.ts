@@ -96,6 +96,8 @@ export type Assertion =
 export interface AgentCliConfig {
   runner: 'opencode' | 'claude' | 'gemini';  // Agent 类型
   command: string;                           // 实际执行的 CLI 命令名
+  model?: string;   // 可选：默认 model（如 "anthropic/claude-3.5-sonnet"）
+  agent?: string;   // 可选：默认 agent 名称
 }
 
 export interface GlobalConfig {
