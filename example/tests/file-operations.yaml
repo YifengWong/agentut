@@ -76,9 +76,12 @@ config:
   agent_cli:
     runner: opencode      # Agent 类型 (opencode, claude, gemini)
     command: opencode       # 实际执行的 CLI 命令名
+    model: bailian-coding-plan/qwen3.5-plus
   judges:
     simple-judge:
       runner: opencode
       command: opencode
+      model: bailian-coding-plan/qwen3.5-plus
+      agent: plan
   default_timeout: 300000
   parallel: false
