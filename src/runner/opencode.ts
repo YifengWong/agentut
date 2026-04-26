@@ -64,14 +64,14 @@ export class OpenCodeRunner implements AgentRunner {
     // Always use JSON format
     args.push('--format json');
 
-    // Add optional model
+    // Add optional model (quoted for special characters like / and .)
     if (options.model) {
-      args.push(`--model ${options.model}`);
+      args.push(`--model "${options.model}"`);
     }
 
-    // Add optional agent
+    // Add optional agent (quoted for safety)
     if (options.agent) {
-      args.push(`--agent ${options.agent}`);
+      args.push(`--agent "${options.agent}"`);
     }
 
     const fullCommand = args.join(' ');

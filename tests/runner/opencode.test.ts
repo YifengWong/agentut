@@ -148,7 +148,7 @@ describe('OpenCodeRunner', () => {
       });
 
       expect(execSync).toHaveBeenCalledWith(
-        expect.stringContaining('--model claude-sonnet'),
+        expect.stringContaining('--model "claude-sonnet"'),
         expect.any(Object)
       );
     });
@@ -162,7 +162,21 @@ describe('OpenCodeRunner', () => {
       });
 
       expect(execSync).toHaveBeenCalledWith(
-        expect.stringContaining('--agent my-skill'),
+        expect.stringContaining('--agent "my-skill"'),
+        expect.any(Object)
+      );
+    });
+
+    it('should quote model value with special characters', () => {
+      vi.mocked(execSync).mockReturnValue('{}');
+
+      runner.run({
+        input: 'Test',
+        model: 'anthropic/claude-3.5-sonnet'
+      });
+
+      expect(execSync).toHaveBeenCalledWith(
+        expect.stringContaining('--model "anthropic/claude-3.5-sonnet"'),
         expect.any(Object)
       );
     });
