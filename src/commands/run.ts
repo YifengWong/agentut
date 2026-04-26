@@ -132,8 +132,8 @@ async function executeScenario(
   // Log scenario start
   logger.startScenario(scenario.name, current, total);
 
-  // Get model from options or config (backwards compatibility)
-  const model = options?.model || suite.config?.target?.model;
+  // Get model with priority: CLI > agent_cli.model > target.model (deprecated)
+  const model = options?.model || suite.config?.agent_cli?.model || suite.config?.target?.model;
 
   // Get environment config for agent derivation
   const envConfig = suite.environments[scenario.environment];
