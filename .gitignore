@@ -6,3 +6,5 @@ temp/
 coverage/
 .npmrc
 notes.md
+docs/
+.claude/
