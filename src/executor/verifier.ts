@@ -544,7 +544,9 @@ export async function verifyJudgedBy(
     const result = runner.run({
       input: combinedPrompt,
       directory: judgeDir,  // AI裁判运行在场景临时目录
-      timeout
+      timeout,
+      model: judgeConfig.model,    // 传递 judge 配置的 model
+      agent: judgeConfig.agent     // 传递 judge 配置的 agent
     });
 
     // 5. 解析裁判输出

@@ -1279,4 +1279,138 @@ describe('verifyJudgedBy', () => {
     const fileExists = await fs.pathExists(tempFile);
     expect(fileExists).toBe(false);
   });
+
+  it('should pass model from judge config to runner', async () => {
+    const mockRunner = {
+      runnerType: 'opencode',
+      run: vi.fn().mockReturnValue({
+        outputs: [
+          { type: 'text', part: { text: '{"passed":true,"reason":"OK"}' } }
+        ],
+        sessionId: 'judge-session-model'
+      }),
+      exportSession: vi.fn(),
+      listSessions: vi.fn()
+    };
+
+    vi.mocked(createRunner).mockReturnValue(mockRunner as any);
+
+    const judgesWithModel: Record<string, AgentCliConfig> = {
+      'gpt-judge': {
+        runner: 'opencode',
+        command: 'opencode',
+        model: 'openai/gpt-4o'
+      }
+    };
+
+    const assertion: JudgedByAssertion = {
+      judge: 'gpt-judge',
+      prompt: 'Evaluate'
+    };
+
+    await verifyJudgedBy(
+      [],
+      assertion,
+      judgesWithModel,
+      defaultTimeout,
+      tempRoot,
+      tempRoot
+    );
+
+    expect(mockRunner.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'openai/gpt-4o'
+      })
+    );
+  });
+
+  it('should pass agent from judge config to runner', async () => {
+    const mockRunner = {
+      runnerType: 'opencode',
+      run: vi.fn().mockReturnValue({
+        outputs: [
+          { type: 'text', part: { text: '{"passed":true,"reason":"OK"}' } }
+        ],
+        sessionId: 'judge-session-agent'
+      }),
+      exportSession: vi.fn(),
+      listSessions: vi.fn()
+    };
+
+    vi.mocked(createRunner).mockReturnValue(mockRunner as any);
+
+    const judgesWithAgent: Record<string, AgentCliConfig> = {
+      'custom-judge': {
+        runner: 'opencode',
+        command: 'opencode',
+        agent: 'reviewer-agent'
+      }
+    };
+
+    const assertion: JudgedByAssertion = {
+      judge: 'custom-judge',
+      prompt: 'Review'
+    };
+
+    await verifyJudgedBy(
+      [],
+      assertion,
+      judgesWithAgent,
+      defaultTimeout,
+      tempRoot,
+      tempRoot
+    );
+
+    expect(mockRunner.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agent: 'reviewer-agent'
+      })
+    );
+  });
+
+  it('should pass both model and agent from judge config', async () => {
+    const mockRunner = {
+      runnerType: 'opencode',
+      run: vi.fn().mockReturnValue({
+        outputs: [
+          { type: 'text', part: { text: '{"passed":true,"reason":"OK"}' } }
+        ],
+        sessionId: 'judge-session-both'
+      }),
+      exportSession: vi.fn(),
+      listSessions: vi.fn()
+    };
+
+    vi.mocked(createRunner).mockReturnValue(mockRunner as any);
+
+    const judgesWithBoth: Record<string, AgentCliConfig> = {
+      'full-judge': {
+        runner: 'opencode',
+        command: 'opencode',
+        model: 'anthropic/claude-3.5-sonnet',
+        agent: 'strict-reviewer'
+      }
+    };
+
+    const assertion: JudgedByAssertion = {
+      judge: 'full-judge',
+      prompt: 'Full review'
+    };
+
+    await verifyJudgedBy(
+      [],
+      assertion,
+      judgesWithBoth,
+      defaultTimeout,
+      tempRoot,
+      tempRoot
+    );
+
+    expect(mockRunner.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'anthropic/claude-3.5-sonnet',
+        agent: 'strict-reviewer'
+      })
+    );
+  });
 });
