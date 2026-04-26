@@ -142,7 +142,8 @@ async function executeScenario(
   // 1. CLI options --agent
   // 2. Environment config agent field
   // 3. Derive from setup.copy targeting .opencode/agents
-  // 4. Config target.agent (deprecated)
+  // 4. Config agent_cli.agent
+  // 5. Config target.agent (deprecated)
   let agent = options?.agent;
 
   if (!agent && envConfig.agent) {
@@ -158,6 +159,11 @@ async function executeScenario(
       const source = agentCopy.copy!.split('->')[0].trim();
       agent = path.basename(source, '.md');
     }
+  }
+
+  // 从 agent_cli.agent 获取
+  if (!agent && suite.config?.agent_cli?.agent) {
+    agent = suite.config.agent_cli.agent;
   }
 
   if (!agent && suite.config?.target?.agent) {
