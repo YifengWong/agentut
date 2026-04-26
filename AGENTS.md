@@ -290,9 +290,33 @@ config:
   agent_cli:
     runner: opencode      # Agent 类型
     command: mycode       # 自定义命令名
+    model: anthropic/claude-3.5-sonnet  # 可选：默认 model
+    agent: my-custom-agent              # 可选：默认 agent
+  judges:
+    code-reviewer:
+      runner: opencode
+      command: opencode
+      model: openai/gpt-4o              # AI裁判使用的 model
+      agent: reviewer-agent             # AI裁判使用的 agent
 ```
 
 验证层自动设置默认值 `{ runner: 'opencode', command: 'opencode' }`。
+
+### Model/Agent 优先级
+
+**Model 优先级：**
+1. CLI 参数 `--model`
+2. YAML `config.agent_cli.model`
+3. YAML `config.target.model`（已废弃）
+
+**Agent 优先级：**
+1. CLI 参数 `--agent`
+2. Environment 配置 `agent` 字段
+3. 从 `setup.copy` 推导（复制到 `.opencode/agents`）
+4. YAML `config.agent_cli.agent`
+5. YAML `config.target.agent`（已废弃）
+
+**注意：** model 值可能包含 `/` 或 `.` 字符（如 `anthropic/claude-3.5-sonnet`），CLI 参数会自动添加引号处理。
 
 ### Runner 抽象
 
