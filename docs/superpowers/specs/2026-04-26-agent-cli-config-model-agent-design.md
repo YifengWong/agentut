@@ -36,6 +36,12 @@ config:
     command: opencode
     model: anthropic/claude-3.5-sonnet
     agent: my-custom-agent
+  judges:
+    strict-judge:
+      runner: opencode
+      command: opencode
+      model: openai/gpt-4o         # AI裁判使用的model
+      agent: judge-agent           # AI裁判使用的agent
 ```
 
 ### 3. 优先级逻辑
@@ -87,6 +93,30 @@ if (options.agent) {
 }
 ```
 
+#### 4.3 `src/executor/verifier.ts`
+
+在 `verifyJudgedBy` 函数中，将 judge 配置的 model/agent 传递给 runner：
+
+```typescript
+// 当前实现（verifier.ts:544-548）
+const result = runner.run({
+  input: combinedPrompt,
+  directory: judgeDir,
+  timeout
+});
+
+// 变更后
+const result = runner.run({
+  input: combinedPrompt,
+  directory: judgeDir,
+  timeout,
+  model: judgeConfig.model,    // 传递 judge 的 model
+  agent: judgeConfig.agent     // 传递 judge 的 agent
+});
+```
+
+**说明**：judge 配置使用 `AgentCliConfig` 类型，扩展后自动支持 model/agent 字段。
+
 ### 5. 无需变更的部分
 
 - `src/parser/yaml.ts`：无需新增验证，可选字段自动解析
@@ -100,6 +130,7 @@ if (options.agent) {
 | `src/types/index.ts` | 扩展接口 |
 | `src/commands/run.ts` | 修改优先级逻辑 |
 | `src/runner/opencode.ts` | 添加引号处理 |
+| `src/executor/verifier.ts` | 传递 judge 的 model/agent |
 | `AGENTS.md` | 文档更新 |
 
 ## 测试要点
@@ -109,3 +140,4 @@ if (options.agent) {
 3. model 值含 `/` 和 `.` 字符时正确传递
 4. 向后兼容：不配置时行为不变
 5. `config.target` 废弃字段仍生效（向后兼容）
+6. AI Judge 配置 model/agent 后，裁判执行时使用指定配置
