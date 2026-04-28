@@ -278,7 +278,8 @@ async function executeScenario(
             runResult.outputs,
             tempDirectory,
             suite.config,  // 新增：传入全局配置
-            tempRoot       // 新增：传入临时目录根路径
+            tempRoot,      // 新增：传入临时目录根路径
+            yamlDirectory  // 新增：传递 YAML 文件目录
           );
 
           const stepPassed = assertionResults.every(a => a.passed);
