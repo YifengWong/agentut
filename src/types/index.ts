@@ -81,12 +81,24 @@ export interface JudgedByAssertion {
   min_pass?: number;   // 概率测试支持
 }
 
+/**
+ * 命令执行断言配置
+ */
+export interface ExecCommandAssertion {
+  command: string;           // 要执行的命令
+  expect: Matcher;           // 输出匹配条件
+  timeout?: number;          // 可选超时覆盖
+  cwd?: string;              // 可选执行目录
+  min_pass?: number;         // 概率测试支持
+}
+
 export type Assertion =
   | { should_call_tool: string | ToolCallAssertion }
   | { should_produce_file: string | Matcher }
   | { file_content_contains: { file: string; text: string } | FileContentAssertion }
   | { response_contains: string | Matcher }
-  | { judged_by: JudgedByAssertion };  // AI裁判断言
+  | { judged_by: JudgedByAssertion }  // AI裁判断言
+  | { exec_command: ExecCommandAssertion };
 
 // ========== Agent CLI Configuration ==========
 
@@ -338,6 +350,9 @@ export interface AssertionResult {
     files?: string[];
     responses?: string[];
     reason?: string;  // AI裁判返回的原因
+    stdout?: string;      // 新增：命令标准输出
+    stderr?: string;      // 新增：命令错误输出
+    exitCode?: number;    // 新增：命令退出码
   };
   message?: string;
 }
