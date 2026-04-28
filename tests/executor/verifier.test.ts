@@ -888,6 +888,77 @@ describe('Verifier', () => {
         })
       );
     });
+
+    it('should verify exec_command assertion', async () => {
+      const workDir = path.join(TEST_TEMP_DIR, 'exec-work');
+      await fs.ensureDir(workDir);
+
+      const assertions: Assertion[] = [
+        {
+          exec_command: {
+            command: 'echo "Test output"',
+            expect: { contains: 'Test output' }
+          }
+        }
+      ];
+
+      const results = await verifyAssertions(assertions, [], workDir, undefined, undefined, workDir);
+
+      expect(results).toHaveLength(1);
+      expect(results[0].passed).toBe(true);
+      expect(results[0].type).toBe('exec_command');
+    });
+
+    it('should verify exec_command with cwd parameter', async () => {
+      const workDir = path.join(TEST_TEMP_DIR, 'cwd-work');
+      const subDir = path.join(TEST_TEMP_DIR, 'subdir');
+      await fs.ensureDir(workDir);
+      await fs.ensureDir(subDir);
+      await fs.writeFile(path.join(subDir, 'file.txt'), 'subdir content');
+
+      const assertions: Assertion[] = [
+        {
+          exec_command: {
+            command: 'cat file.txt',
+            expect: { contains: 'subdir content' },
+            cwd: './subdir'
+          }
+        }
+      ];
+
+      const results = await verifyAssertions(assertions, [], workDir, undefined, undefined, TEST_TEMP_DIR);
+
+      expect(results).toHaveLength(1);
+      expect(results[0].passed).toBe(true);
+    });
+
+    it('should support mixed assertions including exec_command', async () => {
+      const workDir = path.join(TEST_TEMP_DIR, 'mixed-exec');
+      await fs.ensureDir(workDir);
+      await fs.writeFile(path.join(workDir, 'output.txt'), 'Hello');
+
+      const outputs: OpenCodeRunOutput[] = [
+        { type: 'tool_call', data: { tool_name: 'Write' }, session_id: 'ses_1', timestamp: 1 }
+      ];
+
+      const assertions: Assertion[] = [
+        { should_call_tool: 'Write' },
+        { should_produce_file: 'output.txt' },
+        {
+          exec_command: {
+            command: 'cat output.txt',
+            expect: { contains: 'Hello' }
+          }
+        }
+      ];
+
+      const results = await verifyAssertions(assertions, outputs, workDir, undefined, undefined, workDir);
+
+      expect(results).toHaveLength(3);
+      expect(results[0].passed).toBe(true); // should_call_tool
+      expect(results[1].passed).toBe(true); // should_produce_file
+      expect(results[2].passed).toBe(true); // exec_command
+    });
   });
 });
 
