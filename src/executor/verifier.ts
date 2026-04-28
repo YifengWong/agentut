@@ -387,7 +387,8 @@ export async function verifyAssertions(
   outputs: OpenCodeRunOutput[],
   workDir: string,
   config?: GlobalConfig,
-  tempRoot?: string
+  tempRoot?: string,
+  yamlDir?: string  // 新增参数：YAML文件所在目录
 ): Promise<AssertionResult[]> {
   const results: AssertionResult[] = [];
   const judges = config?.judges || {};
@@ -419,6 +420,16 @@ export async function verifyAssertions(
         defaultTimeout,
         tempRoot || workDir,
         workDir  // AI裁判运行目录：使用场景临时目录
+      ));
+    }
+
+    // exec_command 断言
+    if ('exec_command' in assertion) {
+      results.push(await verifyExecCommand(
+        assertion.exec_command,
+        workDir,
+        defaultTimeout,
+        yamlDir || workDir
       ));
     }
   }
