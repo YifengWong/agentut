@@ -159,6 +159,7 @@ opencode export ses_xxx > .agentut/sessions/base-session.json
 | `file_content_contains` | `{ file, text }` | 验证文件内容包含指定文本 |
 | `response_contains` | 字符串：文本 | 验证响应包含指定文本 |
 | `judged_by` | `{ judge, prompt, timeout?, min_pass? }` | AI裁判语义评判 |
+| `exec_command` | `{ command, expect, timeout?, cwd? }` | 执行命令并验证输出 |
 
 ### Matcher 模式（灵活匹配）
 
@@ -367,6 +368,72 @@ scenarios:
               judge: reviewer
               prompt: "检查函数是否正确处理边界情况，是否有适当的注释"
               timeout: 60000
+```
+
+### 命令执行断言
+
+`exec_command` 断言用于执行外部命令并验证命令输出内容，适用于：
+- Java 编译验证（javac 命令）
+- 单元测试验证（mvn test、npm test）
+- 构建验证（gradle build、make）
+
+#### 配置格式
+
+```yaml
+expected:
+  - exec_command:
+      command: "mvn test"               # 必填：要执行的命令
+      expect: { contains: "BUILD SUCCESS" }  # 必填：Matcher 模式匹配输出
+      timeout: 300000                   # 可选：超时覆盖
+      cwd: "./subproject"               # 可选：执行目录
+```
+
+#### 字段说明
+
+| 字段 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| `command` | string | 是 | - | 要执行的命令 |
+| `expect` | Matcher | 是 | - | 输出匹配条件，支持 equals/contains/regex/oneOf |
+| `timeout` | number | 否 | global.default_timeout | 命令执行超时（毫秒） |
+| `cwd` | string | 否 | 场景工作目录 | 执行目录，相对路径基于 YAML 文件 |
+
+#### 使用示例
+
+**Java 编译验证：**
+
+```yaml
+steps:
+  - input: "创建一个 Java 类 Main.java"
+    expected:
+      - should_call_tool: Write
+      - should_produce_file: Main.java
+      - exec_command:
+          command: "javac Main.java"
+          expect: { contains: "compiled successfully" }
+```
+
+**Maven 单元测试验证：**
+
+```yaml
+steps:
+  - input: "创建一个带有单元测试的项目"
+    expected:
+      - exec_command:
+          command: "mvn test"
+          expect: { contains: "BUILD SUCCESS" }
+          timeout: 300000
+```
+
+**指定子目录执行：**
+
+```yaml
+steps:
+  - input: "在 src 目录下创建代码"
+    expected:
+      - exec_command:
+          command: "npm test"
+          cwd: "./src"
+          expect: { regex: ".*passing.*" }
 ```
 
 ## 概率性测试
