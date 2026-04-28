@@ -7,9 +7,10 @@ import {
   verifyShouldProduceFile,
   verifyFileContentContains,
   verifyResponseContains,
-  verifyJudgedBy
+  verifyJudgedBy,
+  verifyExecCommand
 } from '../../src/executor/verifier.js';
-import { type Assertion, type OpenCodeRunOutput, type StepResult, type AgentCliConfig, type JudgedByAssertion } from '../../src/types/index.js';
+import { type Assertion, type OpenCodeRunOutput, type StepResult, type AgentCliConfig, type JudgedByAssertion, type ExecCommandAssertion } from '../../src/types/index.js';
 
 // Mock createRunner
 vi.mock('../../src/runner/factory.js', () => ({
@@ -1412,5 +1413,111 @@ describe('verifyJudgedBy', () => {
         agent: 'strict-reviewer'
       })
     );
+  });
+});
+
+describe('verifyExecCommand', () => {
+  const workDir = TEST_TEMP_DIR;
+  const defaultTimeout = 30000;
+  const yamlDir = TEST_TEMP_DIR;
+
+  it('should return true when output matches contains matcher', async () => {
+    const assertion: ExecCommandAssertion = {
+      command: 'echo "BUILD SUCCESS"',
+      expect: { contains: 'BUILD SUCCESS' }
+    };
+
+    const result = await verifyExecCommand(assertion, workDir, defaultTimeout, yamlDir);
+
+    expect(result.passed).toBe(true);
+    expect(result.type).toBe('exec_command');
+    expect(result.message).toContain('matches');
+    expect(result.actual?.stdout).toContain('BUILD SUCCESS');
+  });
+
+  it('should return false when output does not match', async () => {
+    const assertion: ExecCommandAssertion = {
+      command: 'echo "Hello World"',
+      expect: { contains: 'BUILD SUCCESS' }
+    };
+
+    const result = await verifyExecCommand(assertion, workDir, defaultTimeout, yamlDir);
+
+    expect(result.passed).toBe(false);
+    expect(result.type).toBe('exec_command');
+    expect(result.message).toContain('does not match');
+  });
+
+  it('should support regex matcher', async () => {
+    const assertion: ExecCommandAssertion = {
+      command: 'echo "Tests run: 5, Failures: 0"',
+      expect: { regex: 'Tests run.*Failures: 0' }
+    };
+
+    const result = await verifyExecCommand(assertion, workDir, defaultTimeout, yamlDir);
+
+    expect(result.passed).toBe(true);
+  });
+
+  it('should support oneOf matcher', async () => {
+    const assertion: ExecCommandAssertion = {
+      command: 'printf "done"',
+      expect: { oneOf: ['BUILD SUCCESS', 'done', 'passing'] }
+    };
+
+    const result = await verifyExecCommand(assertion, workDir, defaultTimeout, yamlDir);
+
+    expect(result.passed).toBe(true);
+  });
+
+  it('should return exitCode in actual', async () => {
+    const assertion: ExecCommandAssertion = {
+      command: 'echo "test"',
+      expect: { contains: 'test' }
+    };
+
+    const result = await verifyExecCommand(assertion, workDir, defaultTimeout, yamlDir);
+
+    expect(result.actual?.exitCode).toBe(0);
+  });
+
+  it('should handle command execution error', async () => {
+    const assertion: ExecCommandAssertion = {
+      command: 'nonexistent_command_xyz',
+      expect: { contains: 'anything' }
+    };
+
+    const result = await verifyExecCommand(assertion, workDir, defaultTimeout, yamlDir);
+
+    expect(result.passed).toBe(false);
+  });
+
+  it('should use cwd parameter for execution directory', async () => {
+    const subDir = path.join(TEST_TEMP_DIR, 'subproject');
+    await fs.ensureDir(subDir);
+    await fs.writeFile(path.join(subDir, 'test.txt'), 'content from subdir');
+
+    const assertion: ExecCommandAssertion = {
+      command: 'cat test.txt',
+      expect: { contains: 'content from subdir' },
+      cwd: './subproject'
+    };
+
+    const result = await verifyExecCommand(assertion, workDir, defaultTimeout, yamlDir);
+
+    expect(result.passed).toBe(true);
+  });
+
+  it('should use default workDir when cwd not specified', async () => {
+    await fs.writeFile(path.join(TEST_TEMP_DIR, 'workfile.txt'), 'work content');
+
+    const assertion: ExecCommandAssertion = {
+      command: 'cat workfile.txt',
+      expect: { contains: 'work content' }
+    };
+
+    const result = await verifyExecCommand(assertion, workDir, defaultTimeout, yamlDir);
+
+    expect(result.passed).toBe(true);
   });
 });
