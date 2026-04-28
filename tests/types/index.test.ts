@@ -12,6 +12,7 @@ import {
   type ToolCallAssertion,
   type FileContentAssertion,
   type JudgedByAssertion,
+  type ExecCommandAssertion,
   type StepResult,
   type ScenarioResult,
   type RunExecution,
@@ -121,6 +122,31 @@ describe('Assertion Type', () => {
     expect('judged_by' in assertion).toBe(true);
     expect((assertion as { judged_by: JudgedByAssertion }).judged_by.timeout).toBe(60000);
     expect((assertion as { judged_by: JudgedByAssertion }).judged_by.min_pass).toBe(8);
+  });
+
+  it('should allow exec_command assertion', () => {
+    const assertion: Assertion = {
+      exec_command: {
+        command: 'mvn test',
+        expect: { contains: 'BUILD SUCCESS' }
+      }
+    };
+    expect('exec_command' in assertion).toBe(true);
+  });
+
+  it('should allow exec_command assertion with optional fields', () => {
+    const assertion: Assertion = {
+      exec_command: {
+        command: 'npm test',
+        expect: { regex: '.*passing.*' },
+        timeout: 300000,
+        cwd: './src',
+        min_pass: 4
+      }
+    };
+    expect('exec_command' in assertion).toBe(true);
+    expect((assertion as { exec_command: ExecCommandAssertion }).exec_command.timeout).toBe(300000);
+    expect((assertion as { exec_command: ExecCommandAssertion }).exec_command.cwd).toBe('./src');
   });
 });
 
