@@ -71,7 +71,7 @@ cli/
 | `runner/opencode.ts` | OpenCode CLI 执行封装 | runner/types, types |
 | `runner/factory.ts` | Runner 实例创建工厂 | runner/opencode, types |
 | `executor/fixture.ts` | 环境复制、setup 执行、cleanup 清理 | 无 |
-| `executor/verifier.ts` | 执行断言验证，返回验证结果 | types |
+| `executor/verifier.ts` | 执行断言验证，返回验证结果（含 exec_command 命令执行） | types |
 | `output/json.ts` | 生成 JSON 测试结果 | types |
 | `output/formatters/*` | 格式转换（HTML、Markdown、Jest） | types |
 
@@ -274,6 +274,7 @@ import * as fs from 'fs-extra';
 | `should_produce_file` | 检查工作目录是否存在该文件 |
 | `file_content_contains` | 读取文件，检查内容包含指定文本 |
 | `response_contains` | 检查 outputs 中 type=text 的 data.content |
+| `exec_command` | 执行命令，检查输出（stdout+stderr）是否匹配 Matcher |
 
 ### 临时目录命名
 
