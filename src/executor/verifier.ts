@@ -1,5 +1,6 @@
 import fs from 'fs-extra';
 import * as path from 'path';
+import { spawn } from 'child_process';
 import { createRunner } from '../runner/factory.js';
 import { writeTempJson } from './temp-file.js';
 import {
@@ -422,6 +423,70 @@ export async function verifyAssertions(
   }
 
   return results;
+}
+
+// ========== Command Execution ==========
+
+interface CommandResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+}
+
+/**
+ * 执行命令并收集输出
+ * @param command 要执行的命令
+ * @param cwd 执行目录
+ * @param timeout 超时时间（毫秒）
+ * @returns 命令执行结果
+ */
+async function executeCommand(
+  command: string,
+  cwd: string,
+  timeout: number
+): Promise<CommandResult> {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(command, [], {
+      cwd,
+      shell: true,
+      timeout
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    proc.stdout?.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    proc.stderr?.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    proc.on('close', (code) => {
+      resolve({
+        stdout,
+        stderr,
+        exitCode: code ?? 1
+      });
+    });
+
+    proc.on('error', (err) => {
+      reject(err);
+    });
+
+    // 超时处理：spawn 的 timeout 会自动终止进程
+    // 但我们需要捕获这个事件
+    proc.on('exit', (code, signal) => {
+      if (signal === 'SIGTERM') {
+        resolve({
+          stdout,
+          stderr,
+          exitCode: 1
+        });
+      }
+    });
+  });
 }
 
 // ========== AI Judge Assertion ==========
