@@ -10,6 +10,7 @@ import {
   type Matcher,
   type ToolCallAssertion,
   type FileContentAssertion,
+  type ExecCommandAssertion,  // 新增
   type JudgedByAssertion,
   type AgentCliConfig,
   type GlobalConfig
@@ -487,6 +488,60 @@ async function executeCommand(
       }
     });
   });
+}
+
+/**
+ * 执行命令并验证输出
+ * @param assertion exec_command断言配置
+ * @param workDir 场景工作目录（默认执行目录）
+ * @param defaultTimeout 默认超时时间
+ * @param yamlDir YAML文件所在目录（用于解析相对路径的cwd）
+ */
+export async function verifyExecCommand(
+  assertion: ExecCommandAssertion,
+  workDir: string,
+  defaultTimeout: number,
+  yamlDir: string
+): Promise<AssertionResult> {
+  // 1. 确定执行目录
+  const cwd = assertion.cwd
+    ? path.resolve(yamlDir, assertion.cwd)
+    : workDir;
+
+  // 2. 执行命令
+  const timeout = assertion.timeout || defaultTimeout;
+
+  try {
+    const result = await executeCommand(assertion.command, cwd, timeout);
+
+    // 3. 验证输出（合并 stdout 和 stderr）
+    const output = result.stdout + result.stderr;
+    const passed = matchValue(output, assertion.expect);
+
+    // 4. 返回结果
+    return {
+      type: 'exec_command',
+      value: assertion,
+      passed,
+      actual: {
+        stdout: result.stdout,
+        stderr: result.stderr,
+        exitCode: result.exitCode
+      },
+      message: passed
+        ? `Command '${assertion.command}' output matches ${getMatcherDescription(assertion.expect)}`
+        : `Command '${assertion.command}' output does not match ${getMatcherDescription(assertion.expect)}. Actual output: ${output.substring(0, 200)}`
+    };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+
+    return {
+      type: 'exec_command',
+      value: assertion,
+      passed: false,
+      message: `Command '${assertion.command}' execution failed: ${errorMessage}`
+    };
+  }
 }
 
 // ========== AI Judge Assertion ==========
