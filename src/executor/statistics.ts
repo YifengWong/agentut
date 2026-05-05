@@ -8,6 +8,7 @@ import type {
   ToolCallAssertion,
   FileContentAssertion,
   JudgedByAssertion,
+  ExecCommandAssertion,
   RunExecution,
   AssertionStat
 } from '../types/index.js';
@@ -51,18 +52,20 @@ function getAssertionType(assertion: Assertion): string {
   if ('file_content_contains' in assertion) return 'file_content_contains';
   if ('response_contains' in assertion) return 'response_contains';
   if ('judged_by' in assertion) return 'judged_by';
+  if ('exec_command' in assertion) return 'exec_command';
   return 'unknown';
 }
 
 /**
  * 从 Assertion 提取值
  */
-function getAssertionValue(assertion: Assertion): string | Matcher | ToolCallAssertion | FileContentAssertion | JudgedByAssertion | { file: string; text: string } | undefined {
+function getAssertionValue(assertion: Assertion): string | Matcher | ToolCallAssertion | FileContentAssertion | JudgedByAssertion | ExecCommandAssertion | { file: string; text: string } | undefined {
   if ('should_call_tool' in assertion) return assertion.should_call_tool as string | ToolCallAssertion;
   if ('should_produce_file' in assertion) return assertion.should_produce_file as string | Matcher;
   if ('file_content_contains' in assertion) return assertion.file_content_contains as FileContentAssertion | { file: string; text: string };
   if ('response_contains' in assertion) return assertion.response_contains as string | Matcher;
   if ('judged_by' in assertion) return assertion.judged_by as JudgedByAssertion;
+  if ('exec_command' in assertion) return assertion.exec_command as ExecCommandAssertion;
   return undefined;
 }
 
@@ -94,6 +97,14 @@ function getAssertionMinPass(assertion: Assertion, defaultMinPass: number): numb
     const fileContent = assertion.file_content_contains as FileContentAssertion;
     if (fileContent.min_pass !== undefined && fileContent.min_pass !== null) {
       return fileContent.min_pass;
+    }
+  }
+
+  // 检查 ExecCommandAssertion 内部的 min_pass
+  if ('exec_command' in assertion && typeof assertion.exec_command === 'object' && assertion.exec_command !== null) {
+    const execCommand = assertion.exec_command as ExecCommandAssertion;
+    if (execCommand.min_pass !== undefined && execCommand.min_pass !== null) {
+      return execCommand.min_pass;
     }
   }
 
