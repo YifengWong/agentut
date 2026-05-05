@@ -49,6 +49,9 @@ scenarios:
                 name: { equals: "file-operations" }
               status: completed
           - response_contains: "Hello"
+          - exec_command:
+              command: "node -v"
+              expect: { contains: "24" }
 
   # 场景 3：多步骤串联（先创建再读取）
   - name: create-then-read
