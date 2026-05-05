@@ -333,6 +333,39 @@ config:
 2. 创建 `runner/<name>.ts` 实现 `AgentRunner`
 3. 在 `factory.ts` 添加 case
 
+## 新增断言类型检查清单 (2026-05-05)
+
+> **教训：** 新增 `exec_command` 断言时，遗漏了 `statistics.ts` 和 `yaml.ts` 中的断言类型枚举，
+> 导致报告汇总表中断言统计被静默丢弃。原因是没有系统搜索所有"枚举断言类型"的代码位置。
+
+**当新增一种断言类型时，必须检查和修改以下所有文件：**
+
+| # | 文件 | 修改内容 |
+|---|------|----------|
+| 1 | `src/types/index.ts` | ① 新增 `XxxAssertion` 接口 ② 扩展 `Assertion` 联合类型 ③ 扩展 `AssertionResult.actual` 字段 ④ 扩展 `AssertionResult.value`、`AssertionStat.value`、`AssertionSummary.value` 联合类型 |
+| 2 | `src/executor/verifier.ts` | ① 实现 `verifyXxx()` 验证函数 ② 在 `verifyAssertions()` 循环中添加 `if` 分支 |
+| 3 | `src/executor/statistics.ts` | ① `getAssertionType()` 添加分支（**否则返回 'unknown'**） ② `getAssertionValue()` 添加分支（**否则返回 undefined，断言被静默丢弃**） ③ `getAssertionMinPass()` 添加分支（如支持 `min_pass`） ④ 更新导入和返回类型 |
+| 4 | `src/parser/yaml.ts` | `VALID_ASSERTION_TYPES` 数组添加新类型名（**否则 YAML 解析报错**） |
+| 5 | `src/commands/run.ts` | 如有新增参数传递需求，修改 `verifyAssertions()` 调用 |
+| 6 | `tests/*.test.ts` | 添加类型测试 + 函数单元测试 + 集成测试 |
+| 7 | `README.md` | 更新断言类型表格和文档 |
+| 8 | `AGENTS.md` | 更新此处检查和架构文档 |
+
+**快速验证命令：**
+```bash
+# 搜索所有对现有断言类型的引用，确保新类型没有遗漏
+grep -rn "should_call_tool\|should_produce_file\|file_content_contains\|response_contains\|judged_by" src/ --include="*.ts"
+```
+
+**根本原因：**
+- `getAssertionType()` 使用开放式 `if-return` 链，末尾静默返回 `'unknown'`，而非穷尽匹配
+- 没有集中式断言注册表，每个文件各自维护一份硬编码的断言类型列表
+- 实现计划只覆盖了"主代码路径"，没有系统 grep 所有 switch point
+
+**长期改进建议：**
+- 将断言类型字符串、验证逻辑、统计逻辑集中到统一注册表中
+- 在 `getAssertionType()` 末尾使用 `const _exhaustive: never = assertion` 让 TypeScript 编译器做穷尽性检查
+
 ## 扩展方向
 
 1. **分支场景支持**：允许从特定 checkpoint 开始测试
