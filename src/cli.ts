@@ -43,16 +43,20 @@ program
   .option('-s, --session <sessionId>', 'Session ID to analyze')
   .option('--latest', 'Use the most recent session')
   .option('-o, --output <file>', 'Output file path')
-  .option('--skill <name>', 'Target skill name')
   .option('--name <name>', 'Test suite name')
+  .option('--model <model>', 'Override LLM model')
+  .option('--agent <agent>', 'Override agent')
+  .option('--no-llm', 'Use rule-based extraction instead of LLM')
   .action(async (testFile, options) => {
     try {
       const yaml = await suggestTest(testFile, {
         session: options.session,
         latest: options.latest,
         output: options.output,
-        skill: options.skill,
-        name: options.name
+        name: options.name,
+        model: options.model,
+        agent: options.agent,
+        noLlm: options.noLlm
       });
 
       if (!options.output) {

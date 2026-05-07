@@ -24,10 +24,30 @@ describe('suggest command', () => {
     listSessions: vi.fn()
   };
 
+  const mockRunResult = {
+    outputs: [
+      {
+        part: {
+          text: JSON.stringify({
+            name: 'suggested-test',
+            scenarios: [
+              {
+                name: 'test-scenario',
+                steps: [{ input: 'Create file', expected: [] }]
+              }
+            ]
+          })
+        }
+      }
+    ],
+    sessionId: 'ses_123'
+  };
+
   beforeEach(async () => {
     vi.clearAllMocks();
     await fs.ensureDir(TEST_DIR);
     vi.mocked(createRunner).mockReturnValue(mockRunner as any);
+    mockRunner.run.mockReturnValue(mockRunResult);
   });
 
   afterEach(async () => {
@@ -215,5 +235,69 @@ describe('suggest command', () => {
 
     await expect(suggestTest(yamlPath, { latest: true }))
       .rejects.toThrow('No sessions found');
+  });
+
+  it('should support --no-llm mode for basic assertion generation', async () => {
+    const mockSuite = {
+      name: 'test-project',
+      environments: { default: { directory: '/test', setup: [] } },
+      scenarios: [],
+      config: { agent_cli: { runner: 'opencode', command: 'opencode' } }
+    };
+    vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite as any);
+    vi.mocked(mockRunner.exportSession).mockResolvedValue({
+      info: {
+        id: 'ses_123', slug: 'test', projectID: 'global', directory: '/test',
+        title: 'Test Session', version: '1.0',
+        summary: { additions: 0, deletions: 0, files: 0 },
+        time: { created: Date.now(), updated: Date.now() }
+      },
+      messages: [{
+        info: { role: 'user', time: { created: Date.now() }, id: 'm1', sessionID: 'ses_123' },
+        parts: [{ type: 'text', text: 'Create file', id: 'p1', sessionID: 'ses_123', messageID: 'm1' }]
+      }]
+    });
+
+    const yamlPath = path.join(TEST_DIR, 'config.yaml');
+    await fs.writeFile(yamlPath, 'name: test\nconfig:\n  agent_cli:\n    runner: opencode\n    command: opencode');
+
+    const yaml = await suggestTest(yamlPath, { session: 'ses_123', noLlm: true });
+
+    expect(yaml).toContain('name:');
+    expect(yaml).toContain('Create file');
+  });
+
+  it('should pass --model and --agent options to the LLM generator', async () => {
+    const mockSuite = {
+      name: 'test-project',
+      environments: { default: { directory: '/test', setup: [] } },
+      scenarios: [],
+      config: { agent_cli: { runner: 'opencode', command: 'opencode' } }
+    };
+    vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite as any);
+    vi.mocked(mockRunner.exportSession).mockResolvedValue({
+      info: {
+        id: 'ses_123', slug: 'test', projectID: 'global', directory: '/test',
+        title: 'Test Session', version: '1.0',
+        summary: { additions: 0, deletions: 0, files: 0 },
+        time: { created: Date.now(), updated: Date.now() }
+      },
+      messages: [
+        {
+          info: { role: 'user', time: { created: 1 }, id: 'm1', sessionID: 'ses_123' },
+          parts: [{ type: 'text', text: 'Hello', id: 'p1', sessionID: 'ses_123', messageID: 'm1' }]
+        }
+      ]
+    });
+
+    const yamlPath = path.join(TEST_DIR, 'config.yaml');
+    await fs.writeFile(yamlPath, 'name: test\nconfig:\n  agent_cli:\n    runner: opencode\n    command: opencode');
+
+    await suggestTest(yamlPath, { session: 'ses_123', model: 'gpt-4', agent: 'helper' });
+
+    expect(mockRunner.run).toHaveBeenCalledWith(expect.objectContaining({
+      model: 'gpt-4',
+      agent: 'helper'
+    }));
   });
 });
