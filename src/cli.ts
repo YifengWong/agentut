@@ -56,7 +56,7 @@ program
         name: options.name,
         model: options.model,
         agent: options.agent,
-        noLlm: options.noLlm
+        noLlm: options.llm === false
       });
 
       if (!options.output) {
