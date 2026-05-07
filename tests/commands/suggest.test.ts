@@ -64,7 +64,7 @@ describe('suggest command', () => {
         }
       },
       scenarios: [],
-      config: { agent_cli: { runner: 'opencode', command: 'mycode' } }
+      config: { agent_cli: { runner: 'opencode', command: 'mycode', model: 'test-model' } }
     };
     vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite as any);
     vi.mocked(mockRunner.exportSession).mockResolvedValue({
@@ -91,7 +91,7 @@ describe('suggest command', () => {
 
     const yaml = await suggestTest(yamlPath, { session: 'ses_123' });
 
-    expect(createRunner).toHaveBeenCalledWith({ runner: 'opencode', command: 'mycode' });
+    expect(createRunner).toHaveBeenCalledWith({ runner: 'opencode', command: 'mycode', model: 'test-model' });
     expect(mockRunner.exportSession).toHaveBeenCalledWith('ses_123');
     expect(yaml).toContain('name:');
     expect(yaml).toContain('scenarios:');
@@ -108,7 +108,7 @@ describe('suggest command', () => {
         }
       },
       scenarios: [],
-      config: { agent_cli: { runner: 'opencode', command: 'opencode' } }
+      config: { agent_cli: { runner: 'opencode', command: 'opencode', model: 'test-model' } }
     };
     vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite as any);
     vi.mocked(mockRunner.listSessions).mockResolvedValue([{ id: 'ses_latest' }]);
@@ -145,7 +145,7 @@ describe('suggest command', () => {
         }
       },
       scenarios: [],
-      config: { agent_cli: { runner: 'opencode', command: 'opencode' } }
+      config: { agent_cli: { runner: 'opencode', command: 'opencode', model: 'test-model' } }
     };
     vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite as any);
     vi.mocked(mockRunner.exportSession).mockResolvedValue({
@@ -183,7 +183,7 @@ describe('suggest command', () => {
         }
       },
       scenarios: [],
-      config: { agent_cli: { runner: 'opencode', command: 'opencode' } }
+      config: { agent_cli: { runner: 'opencode', command: 'opencode', model: 'test-model' } }
     };
     vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite as any);
     vi.mocked(mockRunner.exportSession).mockResolvedValue({
@@ -225,7 +225,7 @@ describe('suggest command', () => {
         }
       },
       scenarios: [],
-      config: { agent_cli: { runner: 'opencode', command: 'opencode' } }
+      config: { agent_cli: { runner: 'opencode', command: 'opencode', model: 'test-model' } }
     };
     vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite as any);
     vi.mocked(mockRunner.listSessions).mockResolvedValue([]);
@@ -242,7 +242,7 @@ describe('suggest command', () => {
       name: 'test-project',
       environments: { default: { directory: '/test', setup: [] } },
       scenarios: [],
-      config: { agent_cli: { runner: 'opencode', command: 'opencode' } }
+      config: { agent_cli: { runner: 'opencode', command: 'opencode', model: 'test-model' } }
     };
     vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite as any);
     vi.mocked(mockRunner.exportSession).mockResolvedValue({
@@ -272,7 +272,7 @@ describe('suggest command', () => {
       name: 'test-project',
       environments: { default: { directory: '/test', setup: [] } },
       scenarios: [],
-      config: { agent_cli: { runner: 'opencode', command: 'opencode' } }
+      config: { agent_cli: { runner: 'opencode', command: 'opencode', model: 'test-model' } }
     };
     vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite as any);
     vi.mocked(mockRunner.exportSession).mockResolvedValue({
