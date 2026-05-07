@@ -192,6 +192,7 @@ export interface MessageInfo {
   agent?: string;
   id: string;
   sessionID: string;
+  summary?: SessionSummary;
 }
 
 export interface MessageTime {
@@ -202,9 +203,17 @@ export interface MessageTime {
 export interface Part {
   type: string;
   text?: string;
+  tool?: string;
   tool_name?: string;
   tool_args?: Record<string, unknown>;
   tool_output?: string;
+  callID?: string;
+  state?: {
+    status?: string;
+    input?: Record<string, unknown>;
+    output?: string;
+    error?: string;
+  };
   success?: boolean;
   id: string;
   sessionID: string;

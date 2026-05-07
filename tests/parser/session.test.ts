@@ -73,8 +73,8 @@ describe('analyzeSession', () => {
         {
           info: { role: 'assistant', time: { created: Date.now() }, id: 'msg_2', sessionID: 'ses_test123' },
           parts: [
-            { type: 'tool_call', tool_name: 'Write', id: 'p2', sessionID: 'ses_test123', messageID: 'msg_2' },
-            { type: 'tool_call', tool_name: 'Read', id: 'p3', sessionID: 'ses_test123', messageID: 'msg_2' }
+            { type: 'tool', tool: 'Write', callID: 'call_1', state: { status: 'success' }, id: 'p2', sessionID: 'ses_test123', messageID: 'msg_2' },
+            { type: 'tool', tool: 'Read', callID: 'call_2', state: { status: 'success' }, id: 'p3', sessionID: 'ses_test123', messageID: 'msg_2' }
           ]
         }
       ]
@@ -86,18 +86,20 @@ describe('analyzeSession', () => {
 
   it('should extract file changes from summary', () => {
     const session = createMockSession({
-      info: {
-        ...createMockSession().info,
-        summary: {
-          additions: 10,
-          deletions: 5,
-          files: 2,
-          diffs: [
-            { path: 'src/index.ts', additions: 10, deletions: 5 },
-            { path: 'src/utils.ts', additions: 0, deletions: 0 }
+      messages: [
+        {
+          info: { role: 'user', time: { created: Date.now() }, id: 'msg_1', sessionID: 'ses_test123' },
+          parts: [
+            { type: 'text', text: 'Create some files', id: 'p1', sessionID: 'ses_test123', messageID: 'msg_1' }
+          ]
+        },
+        {
+          info: { role: 'assistant', time: { created: Date.now() }, id: 'msg_2', sessionID: 'ses_test123', summary: { additions: 10, deletions: 5, files: 2, diffs: [{ path: 'src/index.ts', additions: 10, deletions: 5 }, { path: 'src/utils.ts', additions: 0, deletions: 0 }] } },
+          parts: [
+            { type: 'tool', tool: 'Write', callID: 'call_1', state: { status: 'success' }, id: 'p2', sessionID: 'ses_test123', messageID: 'msg_2' }
           ]
         }
-      }
+      ]
     });
 
     const analysis = analyzeSession(session);
@@ -157,7 +159,7 @@ describe('analyzeSession', () => {
           info: { role: 'assistant', time: { created: Date.now() }, id: 'msg_2', sessionID: 'ses_test123' },
           parts: [
             { type: 'step-start', id: 'p2', sessionID: 'ses_test123', messageID: 'msg_2' },
-            { type: 'tool_call', tool_name: 'Write', id: 'p3', sessionID: 'ses_test123', messageID: 'msg_2' },
+            { type: 'tool', tool: 'Write', callID: 'call_1', state: { status: 'success' }, id: 'p3', sessionID: 'ses_test123', messageID: 'msg_2' },
             { type: 'tool_result', tool_output: 'done', id: 'p4', sessionID: 'ses_test123', messageID: 'msg_2' }
           ]
         },
@@ -170,7 +172,7 @@ describe('analyzeSession', () => {
         {
           info: { role: 'assistant', time: { created: Date.now() }, id: 'msg_4', sessionID: 'ses_test123' },
           parts: [
-            { type: 'tool_call', tool_name: 'Edit', id: 'p6', sessionID: 'ses_test123', messageID: 'msg_4' }
+            { type: 'tool', tool: 'Edit', callID: 'call_2', state: { status: 'success' }, id: 'p6', sessionID: 'ses_test123', messageID: 'msg_4' }
           ]
         }
       ]

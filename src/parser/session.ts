@@ -5,6 +5,9 @@ import type {
   StepConfig
 } from '../types/index.js';
 
+/**
+ * @deprecated Use SessionDistiller from src/suggest/distiller/ for new code.
+ */
 export function analyzeSession(session: ExportedSession): SessionAnalysis {
   const inputs: string[] = [];
   const toolCallsByInput: Map<number, string[]> = new Map();
@@ -16,7 +19,12 @@ export function analyzeSession(session: ExportedSession): SessionAnalysis {
     if (message.info.role === 'user') {
       for (const part of message.parts) {
         if (part.type === 'text' && part.text) {
-          inputs.push(part.text);
+          let text = part.text.trim();
+          if ((text.startsWith('"') && text.endsWith('"')) ||
+              (text.startsWith("'") && text.endsWith("'"))) {
+            text = text.slice(1, -1);
+          }
+          inputs.push(text);
           inputIndex++;
           toolCallsByInput.set(inputIndex, []);
         }
@@ -25,19 +33,23 @@ export function analyzeSession(session: ExportedSession): SessionAnalysis {
 
     if (message.info.role === 'assistant') {
       for (const part of message.parts) {
-        if (part.type === 'tool_call' && part.tool_name) {
+        if (part.type === 'tool' && part.tool) {
           const calls = toolCallsByInput.get(inputIndex) || [];
-          calls.push(part.tool_name);
+          calls.push(part.tool);
           toolCallsByInput.set(inputIndex, calls);
         }
       }
     }
   }
 
-  // Extract file changes from summary
-  if (session.info.summary?.diffs) {
-    for (const diff of session.info.summary.diffs) {
-      fileChanges.push(diff.path);
+  // Extract file changes from each message's diffs
+  for (const message of session.messages) {
+    if (message.info.summary?.diffs) {
+      for (const diff of message.info.summary.diffs) {
+        if (diff.path && !fileChanges.includes(diff.path)) {
+          fileChanges.push(diff.path);
+        }
+      }
     }
   }
 
@@ -49,6 +61,9 @@ export function analyzeSession(session: ExportedSession): SessionAnalysis {
   };
 }
 
+/**
+ * @deprecated Use SessionDistiller from src/suggest/distiller/ for new code.
+ */
 export function generateYamlFromAnalysis(analysis: SessionAnalysis): YamlTestSuite {
   const steps: StepConfig[] = [];
 
