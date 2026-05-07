@@ -166,7 +166,7 @@ describe('generateAssertions', () => {
     await generateAssertions(session, mockRunner as any, {});
     const callArgs = mockRunner.run.mock.calls[0][0];
     expect(callArgs.model).toBeUndefined();
-    expect(callArgs.agent).toBeUndefined();
+    expect(callArgs.agent).toBe('plan');  // default agent for safe text output
   });
 });
 

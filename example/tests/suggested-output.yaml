@@ -1,0 +1,48 @@
+name: suggested-test
+description: 从会话自动生成的测试用例
+environments:
+  default:
+    directory: ./fixtures/suggested-env
+      # ↑ 请确保该目录存在。如需空白环境，创建空目录即可；如需预置文件，在目录中放置初始文件。
+    setup: []
+      # ↑ 可选 setup 示例（请根据实际需要修改或删除）:
+      #   - copy: "../skills/your-skill/ -> $WORKDIR/.opencode/skills/your-skill/"
+      #   - run: "npm install"
+      #   - copy: "../fixtures/templates/hello.txt -> $WORKDIR/hello.txt"
+scenarios:
+  - name: suggested-scenario
+    environment: default
+    cleanup: true
+    steps:
+      - input: Please create a file called test-output.txt with content 'This is a test file created by opencode'
+        expected:
+          - should_call_tool: skill
+          - should_call_tool: write
+          - should_call_tool: bash
+        timeout: 60000
+      - input: Now read the test-output.txt file and tell me what it contains
+        expected:
+          - should_call_tool: read
+        timeout: 60000
+      - input: "Please modify test-output.txt to add a second line: 'This is the second line'"
+        expected:
+          - should_call_tool: edit
+          - should_call_tool: read
+          - should_call_tool: edit
+        timeout: 60000
+config:
+  default_timeout: 120000
+  parallel: false
+  agent_cli:
+    runner: opencode
+    command: opencode
+  judges:
+    default:
+      # ↑ 请填写 judge 配置，例如（请根据实际需要修改或删除）:
+      # default:
+      #   runner: opencode
+      #   command: opencode
+      #   model: your-model
+      #   agent: plan
+      runner: opencode
+      command: opencode

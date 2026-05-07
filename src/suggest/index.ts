@@ -48,9 +48,14 @@ export async function suggest(input: SuggestInput): Promise<string> {
   } else {
     const distiller = createDistiller(input.runner.runnerType);
     const distilled = distiller.distill(session);
+
+    // Resolve model/agent: CLI options take priority, then sourceConfig.agent_cli defaults
+    const llmModel = input.model || input.sourceConfig?.agent_cli?.model;
+    const llmAgent = input.agent || input.sourceConfig?.agent_cli?.agent;
+
     suite = await generateAssertions(distilled, input.runner, {
-      model: input.model,
-      agent: input.agent
+      model: llmModel,
+      agent: llmAgent
     });
   }
 

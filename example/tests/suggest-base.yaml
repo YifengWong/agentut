@@ -1,0 +1,38 @@
+# ==========================================
+# suggest 起步配置文件
+# ==========================================
+# 使用方式:
+#   agentut suggest suggest-base.yaml --latest --no-llm
+#   agentut suggest suggest-base.yaml --session <sessionId> --no-llm
+#   agentut suggest suggest-base.yaml --session <sessionId> --model your-model
+# ==========================================
+
+name: suggest-base
+description: 用于 suggest 命令的起步配置，仅含必要的 runner 和 judge 配置。
+
+environments:
+  default:
+    directory: ./fixtures/empty
+    setup: []
+    # ↑ setup 示例：
+    #   - copy: "../skills/your-skill/ -> $WORKDIR/.opencode/skills/your-skill/"
+
+scenarios: []
+# ↑ scenarios 和 steps 由 suggest 命令自动生成，无需手动填写。
+
+config:
+  default_timeout: 120000
+  parallel: false
+  agent_cli:
+    runner: opencode
+    command: opencode
+    model: opencode/minimax-m2.5-free     # 替换为你的 model；suggest LLM 推理时使用
+    agent: plan                           # 使用 plan agent（分析文本，不执行工具）
+  judges:
+    default: {}
+    # ↑ 如需 AI 裁判断言，请填写 judge 配置：
+    # default:
+    #   runner: opencode
+    #   command: opencode
+    #   model: your-model
+    #   agent: plan

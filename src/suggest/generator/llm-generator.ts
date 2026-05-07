@@ -26,14 +26,14 @@ export async function generateAssertions(
 
   const runOpts: RunOptions = {
     input: prompt,
-    timeout: 180000
+    timeout: 180000,
+    // 默认使用 plan agent（只分析输出文本，不执行工具），
+    // 避免 build agent 将 prompt 中的 shell 命令当作指令执行
+    agent: options.agent || 'plan'
   };
 
   if (options.model) {
     runOpts.model = options.model;
-  }
-  if (options.agent) {
-    runOpts.agent = options.agent;
   }
 
   const result = runner.run(runOpts);
