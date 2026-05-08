@@ -38,27 +38,37 @@ const JUDGES_EXAMPLE_4 = '#   model: your-model';
 const JUDGES_EXAMPLE_5 = '#   agent: plan';
 
 export async function suggest(input: SuggestInput): Promise<string> {
+  console.log('[session] 导出会话数据...');
   const session = await input.runner.exportSession(input.sessionId);
 
   let suite: YamlTestSuite;
 
   if (input.noLlm) {
+    console.log('[mode] 规则引擎模式（--no-llm）');
     const analysis = analyzeSession(session);
+    console.log(`[analysis] 提取到 ${analysis.inputs.length} 个步骤, ${analysis.toolCallsByInput.size} 组工具调用`);
     suite = generateYamlFromAnalysis(analysis);
   } else {
+    console.log('[mode] LLM 推理模式');
+    console.log(`[distill] 蒸馏会话数据 (${input.runner.runnerType})...`);
     const distiller = createDistiller(input.runner.runnerType);
     const distilled = distiller.distill(session);
+    console.log(`[distill] 蒸馏完成: ${distilled.steps.length} 个步骤`);
 
     // Resolve model/agent: CLI options take priority, then sourceConfig.agent_cli defaults
     // model 不是必需的 —— opencode 自身有默认 model 可运行
     const llmModel = input.model || input.sourceConfig?.agent_cli?.model;
     const llmAgent = input.agent || input.sourceConfig?.agent_cli?.agent;
 
+    console.log(`[llm] model: ${llmModel || '(opencode 默认)'}, agent: ${llmAgent || '(opencode 默认)'}`);
+    console.log('[llm] 调用 LLM 推理生成断言...');
     suite = await generateAssertions(distilled, input.runner, {
       model: llmModel,
       agent: llmAgent
     });
   }
+
+  console.log(`[result] 生成测试 "${suite.name}": ${suite.scenarios.length} 个场景, ${suite.scenarios.reduce((n, s) => n + s.steps.length, 0)} 个步骤`);
 
   if (input.name) {
     suite.name = input.name;

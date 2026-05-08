@@ -32,6 +32,7 @@ export async function suggestTest(options: SuggestOptions = {}): Promise<string>
 
   // Load base config file if specified
   if (options.base) {
+    console.log(`[config] 读取配置文件: ${options.base}`);
     if (!await fs.pathExists(options.base)) {
       throw new ExecutionError(`Base config file not found: ${options.base}`, options.base);
     }
@@ -40,6 +41,8 @@ export async function suggestTest(options: SuggestOptions = {}): Promise<string>
     if (suite.config) {
       sourceConfig = suite.config;
     }
+  } else {
+    console.log('[config] 使用默认配置');
   }
 
   if (!sourceConfig.agent_cli) {
@@ -47,15 +50,20 @@ export async function suggestTest(options: SuggestOptions = {}): Promise<string>
   }
 
   const runner = createRunner(sourceConfig.agent_cli);
+  console.log(`[runner] 类型: ${sourceConfig.agent_cli.runner}, 命令: ${sourceConfig.agent_cli.command}${sourceConfig.agent_cli.model ? ', model: ' + sourceConfig.agent_cli.model : ''}`);
 
   let sessionId = options.session;
 
   if (options.latest) {
+    console.log('[session] 查找最近的会话...');
     const sessions = await runner.listSessions();
     if (sessions.length === 0) {
       throw new ExecutionError('No sessions found. Run opencode first to create a session.', '');
     }
     sessionId = sessions[0].id;
+    console.log(`[session] 使用最近会话: ${sessionId}`);
+  } else {
+    console.log(`[session] 使用指定会话: ${sessionId}`);
   }
 
   if (!sessionId) {
@@ -74,6 +82,7 @@ export async function suggestTest(options: SuggestOptions = {}): Promise<string>
 
   if (options.output) {
     await fs.writeFile(options.output, yamlString, 'utf-8');
+    console.log(`[output] 测试用例已写入: ${options.output}`);
   }
 
   return yamlString;
