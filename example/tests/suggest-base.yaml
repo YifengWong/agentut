@@ -4,7 +4,7 @@
 # 使用方式:
 #   agentut suggest suggest-base.yaml --latest --no-llm
 #   agentut suggest suggest-base.yaml --session <sessionId> --no-llm
-#   agentut suggest suggest-base.yaml --session <sessionId> --model your-model
+#   agentut suggest suggest-base.yaml --session <sessionId> -o your-new-tests.yaml
 # ==========================================
 
 name: suggest-base
@@ -26,13 +26,3 @@ config:
   agent_cli:
     runner: opencode
     command: opencode
-    model: opencode/minimax-m2.5-free     # 替换为你的 model；suggest LLM 推理时使用
-    agent: plan                           # 使用 plan agent（分析文本，不执行工具）
-  judges:
-    default: {}
-    # ↑ 如需 AI 裁判断言，请填写 judge 配置：
-    # default:
-    #   runner: opencode
-    #   command: opencode
-    #   model: your-model
-    #   agent: plan
