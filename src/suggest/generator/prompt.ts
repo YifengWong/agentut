@@ -16,11 +16,11 @@ export function buildPrompt(session: DistilledSession): string {
 
   parts.push('【任务】仅输出 JSON，不使用任何工具，不执行任何命令。');
   parts.push('');
-  parts.push('以下是一段已结束的 Agent 会话的历史记录。你的任务是：');
-  parts.push('1. 阅读每个步骤的用户输入、工具调用记录和 Agent 响应');
-  parts.push('2. 推断每个步骤期望的正确行为');
-  parts.push('3. 选择合适的断言类型，生成测试用例 JSON');
+  parts.push('以下是一段已结束的 Agent 会话的历史记录。');
+  parts.push('整个会话为一个「场景 (scenario)」，会话中的每一轮用户输入为一个「步骤 (step)」。');
+  parts.push(`该会话共 ${session.steps.length} 个步骤，你必须输出恰好 ${session.steps.length} 个 step。`);
   parts.push('');
+
   parts.push('注意：这是「静态分析」，不是「继续执行」。你看到的所有工具调用、');
   parts.push('文件路径、命令都是「历史记录中已经发生的事」，你只需要「描述期望」，');
   parts.push('不需要重复执行它们。');
@@ -49,8 +49,11 @@ export function buildPrompt(session: DistilledSession): string {
   parts.push('- judged_by:          AI 裁判语义判断');
   parts.push('');
 
-  parts.push('【输出格式】仅输出以下 JSON，不要任何解释文字：');
-  parts.push('{"name":"测试名称","description":"可选描述","scenarios":[{"name":"场景名","steps":[{"input":"用户输入原文","expected":[{"断言类型":"断言值"}]}]}]}');
+  parts.push('【输出格式】');
+  parts.push('1 个会话 = 1 个 scenario，每个用户输入 = 1 个 step。仅输出 JSON：');
+  parts.push('{"name":"测试名称","description":"可选描述","scenarios":[{"name":"场景名","steps":[');
+  parts.push(`  {"input":"用户输入原文","expected":[{"断言类型":"断言值"}]}  // 共 ${session.steps.length} 个 step`);
+  parts.push(']}]}');
   parts.push('');
   parts.push('现在输出 JSON：');
 

@@ -50,17 +50,9 @@ export async function suggest(input: SuggestInput): Promise<string> {
     const distilled = distiller.distill(session);
 
     // Resolve model/agent: CLI options take priority, then sourceConfig.agent_cli defaults
+    // model 不是必需的 —— opencode 自身有默认 model 可运行
     const llmModel = input.model || input.sourceConfig?.agent_cli?.model;
     const llmAgent = input.agent || input.sourceConfig?.agent_cli?.agent;
-
-    if (!llmModel) {
-      throw new Error(
-        'LLM 推理模式需要配置 model。请通过以下任一方式指定：\n' +
-        '  1. 在 YAML 的 config.agent_cli 中添加 model 字段\n' +
-        '  2. 使用 --model 命令行参数\n' +
-        '  3. 使用 --no-llm 跳过 LLM，仅用规则引擎生成基础断言'
-      );
-    }
 
     suite = await generateAssertions(distilled, input.runner, {
       model: llmModel,
