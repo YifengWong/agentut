@@ -2,7 +2,7 @@ import fs from 'fs-extra';
 import { createRunner } from '../runner/factory.js';
 import { parseAndValidateYaml } from '../parser/yaml.js';
 import { suggest } from '../suggest/index.js';
-import { ExecutionError } from '../types/index.js';
+import { ExecutionError, type GlobalConfig } from '../types/index.js';
 
 export interface SuggestOptions {
   session?: string;
@@ -12,21 +12,41 @@ export interface SuggestOptions {
   model?: string;
   agent?: string;
   noLlm?: boolean;
+  base?: string;
 }
 
-export async function suggestTest(testFile: string, options: SuggestOptions = {}): Promise<string> {
-  if (!await fs.pathExists(testFile)) {
-    throw new ExecutionError(`Test file not found: ${testFile}`, testFile);
+const DEFAULT_CONFIG: GlobalConfig = {
+  default_timeout: 120000,
+  parallel: false,
+  agent_cli: {
+    runner: 'opencode',
+    command: 'opencode'
+  },
+  judges: {
+    default: {} as unknown as GlobalConfig['judges'] extends Record<string, infer T> | undefined ? T : never
+  }
+};
+
+export async function suggestTest(options: SuggestOptions = {}): Promise<string> {
+  let sourceConfig: GlobalConfig = DEFAULT_CONFIG;
+
+  // Load base config file if specified
+  if (options.base) {
+    if (!await fs.pathExists(options.base)) {
+      throw new ExecutionError(`Base config file not found: ${options.base}`, options.base);
+    }
+    const yamlContent = await fs.readFile(options.base, 'utf-8');
+    const suite = parseAndValidateYaml(yamlContent);
+    if (suite.config) {
+      sourceConfig = suite.config;
+    }
   }
 
-  const yamlContent = await fs.readFile(testFile, 'utf-8');
-  const suite = parseAndValidateYaml(yamlContent);
-
-  if (!suite.config?.agent_cli) {
-    throw new ExecutionError('YAML config must contain config.agent_cli configuration', testFile);
+  if (!sourceConfig.agent_cli) {
+    throw new ExecutionError('Config must contain agent_cli configuration', '');
   }
 
-  const runner = createRunner(suite.config.agent_cli);
+  const runner = createRunner(sourceConfig.agent_cli);
 
   let sessionId = options.session;
 
@@ -49,7 +69,7 @@ export async function suggestTest(testFile: string, options: SuggestOptions = {}
     model: options.model,
     agent: options.agent,
     noLlm: options.noLlm,
-    sourceConfig: suite.config
+    sourceConfig
   });
 
   if (options.output) {

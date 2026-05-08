@@ -38,8 +38,8 @@ program
 
 // suggest command
 program
-  .command('suggest <testFile>')
-  .description('Generate test case suggestion from session (reads runner config from YAML)')
+  .command('suggest')
+  .description('Generate test case suggestion from session')
   .option('-s, --session <sessionId>', 'Session ID to analyze')
   .option('--latest', 'Use the most recent session')
   .option('-o, --output <file>', 'Output file path')
@@ -47,16 +47,18 @@ program
   .option('--model <model>', 'Override LLM model')
   .option('--agent <agent>', 'Override agent')
   .option('--no-llm', 'Use rule-based extraction instead of LLM')
-  .action(async (testFile, options) => {
+  .option('--base <file>', 'Base YAML config file for agent_cli settings')
+  .action(async (options) => {
     try {
-      const yaml = await suggestTest(testFile, {
+      const yaml = await suggestTest({
         session: options.session,
         latest: options.latest,
         output: options.output,
         name: options.name,
         model: options.model,
         agent: options.agent,
-        noLlm: options.llm === false
+        noLlm: options.llm === false,
+        base: options.base
       });
 
       if (!options.output) {
