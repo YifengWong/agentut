@@ -4,6 +4,25 @@ import type { SessionDistiller, DistilledSession, DistilledStep, DistilledToolCa
 const MAX_OUTPUT_LENGTH = 500;
 const MAX_REASONING_LENGTH = 200;
 
+/** 容易被 LLM build agent 误执行的命令类工具 */
+const DANGEROUS_TOOLS = new Set(['bash', 'shell', 'exec', 'execute_command', 'run']);
+
+/**
+ * 对工具调用的 input 做脱敏处理。
+ *
+ * 对于 bash/shell 等命令类工具，替换原始命令字段为描述信息，
+ * 避免 LLM 在 build 模式下将蒸馏数据中的 shell 命令当作指令重新执行。
+ */
+function sanitizeInput(toolName: string, input: Record<string, unknown>): Record<string, unknown> {
+  if (DANGEROUS_TOOLS.has(toolName)) {
+    const description = input['description'] as string | undefined;
+    return {
+      command: description ? `[command: ${description}]` : '[command: omitted]',
+    };
+  }
+  return input;
+}
+
 export class OpenCodeDistiller implements SessionDistiller {
   readonly runnerType = 'opencode';
 
@@ -91,9 +110,11 @@ export class OpenCodeDistiller implements SessionDistiller {
 
     const toolName = p.tool || 'unknown';
     const status = (p.state?.status as DistilledToolCall['status']) || 'completed';
-    const input = p.state?.input || {};
+    const rawInput = (p.state?.input || {}) as Record<string, unknown>;
     let output = p.state?.output;
     const error = p.state?.error;
+
+    const input = sanitizeInput(toolName, rawInput);
 
     if (toolName === 'skill' && input['name']) {
       output = `[Loaded skill: ${input['name']}]`;

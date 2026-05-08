@@ -15,6 +15,7 @@ export function buildPrompt(session: DistilledSession): string {
   const parts: string[] = [];
 
   parts.push('你是一个测试用例生成专家。分析以下 Agent 会话，为每个步骤生成合适的断言。');
+  parts.push('**禁止使用任何工具**');
   parts.push('');
   parts.push('## 会话信息');
   parts.push(`- 工作目录: ${session.workingDirectory}`);
@@ -49,7 +50,7 @@ export function buildPrompt(session: DistilledSession): string {
   parts.push('        {"should_produce_file": "hello.txt"},');
   parts.push('        {"file_content_contains": {"file": "hello.txt", "text": "Hello"}},');
   parts.push('        {"response_contains": "创建成功"},');
-  parts.push('        {"exec_command": {"command": "ls hello.txt", "expect": {"contains": "hello.txt"}}},');
+  parts.push('        {"exec_command": {"command": "echo hello", "expect": {"contains": "hello"}}},');
   parts.push('        {"judged_by": {"judge": "default", "prompt": "检查文件是否正确创建"}}');
   parts.push('      ]');
   parts.push('    }]');
