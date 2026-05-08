@@ -42,9 +42,13 @@ export function validateYamlTestSuite(suite: YamlTestSuite): void {
         `environments.${envName}.directory`
       );
     }
+    // setup 可选，默认空数组
+    if (!envConfig.setup) {
+      envConfig.setup = [];
+    }
     if (!Array.isArray(envConfig.setup)) {
       throw new ValidationError(
-        `Environment "${envName}" is missing required field: setup (must be an array)`,
+        `Environment "${envName}": setup must be an array`,
         `environments.${envName}.setup`
       );
     }

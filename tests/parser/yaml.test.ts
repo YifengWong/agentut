@@ -359,12 +359,12 @@ scenarios:
     expect(result.scenarios[0].steps[0].timeout).toBe(60000);
   });
 
-  it('should throw for invalid YAML', () => {
+  it('should throw for invalid YAML (missing directory)', () => {
     const yaml = `
 name: test
 environments:
   default:
-    directory: ./test
+    setup: []
 scenarios: []
 `;
     expect(() => parseAndValidateYaml(yaml)).toThrow(ValidationError);

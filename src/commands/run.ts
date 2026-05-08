@@ -151,7 +151,7 @@ async function executeScenario(
   }
 
   if (!agent) {
-    const agentCopy = envConfig.setup.find(a =>
+    const agentCopy = (envConfig.setup || []).find(a =>
       a.copy && a.copy.includes('->') &&
       a.copy.split('->')[1].trim().includes('.opencode/agents')
     );

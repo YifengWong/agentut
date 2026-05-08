@@ -177,7 +177,7 @@ export async function prepareEnvironment(
     await copyEnvironment(sourceDir, tempDir, scenarioName);
 
     // Execute setup actions
-    await executeSetup(config.setup, tempDir, yamlDirectory, scenarioName);
+    await executeSetup(config.setup || [], tempDir, yamlDirectory, scenarioName);
 
     const duration = Date.now() - startTime;
     logger.endEnvironmentPrep(scenarioName, true, duration);

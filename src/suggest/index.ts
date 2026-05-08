@@ -75,6 +75,16 @@ export async function suggest(input: SuggestInput): Promise<string> {
     };
   }
 
+  // Ensure all scenarios use default environment
+  for (const scenario of suite.scenarios) {
+    if (!scenario.environment) {
+      scenario.environment = 'default';
+    }
+    if (scenario.cleanup === undefined) {
+      scenario.cleanup = true;
+    }
+  }
+
   // Ensure config
   suite.config = {
     default_timeout: 120000,

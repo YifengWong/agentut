@@ -10,8 +10,8 @@ export interface YamlTestSuite {
 
 export interface EnvironmentConfig {
   directory: string;
-  setup: SetupAction[];
-  agent?: string;  // 可选，显式指定 agent 名称
+  setup?: SetupAction[];  // 可选，默认 []
+  agent?: string;         // 可选，显式指定 agent 名称
 }
 
 export interface SetupAction {
