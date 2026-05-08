@@ -14,50 +14,57 @@ export class MalformedResponseError extends Error {
 export function buildPrompt(session: DistilledSession): string {
   const parts: string[] = [];
 
-  parts.push('你是一个测试用例生成专家。分析以下 Agent 会话，为每个步骤生成合适的断言。');
-  parts.push('**禁止使用任何工具**');
+  parts.push('【任务】仅输出 JSON，不使用任何工具，不执行任何命令。');
   parts.push('');
-  parts.push('## 会话信息');
-  parts.push(`- 工作目录: ${session.workingDirectory}`);
-  parts.push(`- 标题: ${session.title}`);
+  parts.push('以下是一段已结束的 Agent 会话的历史记录。你的任务是：');
+  parts.push('1. 阅读每个步骤的用户输入、工具调用记录和 Agent 响应');
+  parts.push('2. 推断每个步骤期望的正确行为');
+  parts.push('3. 选择合适的断言类型，生成测试用例 JSON');
+  parts.push('');
+  parts.push('注意：这是「静态分析」，不是「继续执行」。你看到的所有工具调用、');
+  parts.push('文件路径、命令都是「历史记录中已经发生的事」，你只需要「描述期望」，');
+  parts.push('不需要重复执行它们。');
   parts.push('');
 
-  parts.push('## 对话流程');
+  parts.push('---');
+  parts.push('');
+  parts.push('【会话元信息】');
+  parts.push(`工作目录: ${session.workingDirectory}`);
+  parts.push(`标题: ${session.title}`);
+  parts.push('');
+
+  parts.push('【会话记录】');
   for (const step of session.steps) {
     parts.push(formatStep(step));
   }
 
-  parts.push('## 可用的断言类型');
-  parts.push('1. should_call_tool: 验证调用了指定工具（支持字符串或 ToolCallAssertion 对象，含 Matcher 模式）');
-  parts.push('2. should_produce_file: 验证文件存在（支持字符串或 Matcher 模式）');
-  parts.push('3. file_content_contains: 验证文件内容包含指定文本（格式: {file: string, text: string}）');
-  parts.push('4. response_contains: 验证 Agent 响应包含指定文本（支持字符串或 Matcher 模式）');
-  parts.push('5. exec_command: 执行命令并验证输出（格式: {command: string, expect: Matcher}）');
-  parts.push('6. judged_by: AI 裁判语义判断（格式: {judge: "default", prompt: string}）');
+  parts.push('---');
+  parts.push('');
+  parts.push('【断言类型参考】');
+  parts.push('- should_call_tool:   验证 Agent 调用了指定工具');
+  parts.push('- should_produce_file: 验证工作目录中产生了指定文件');
+  parts.push('- file_content_contains: 验证文件内容包含指定文本');
+  parts.push('- response_contains:  验证 Agent 的文本响应中包含指定字符串');
+  parts.push('- exec_command:       执行命令并验证其输出');
+  parts.push('- judged_by:          AI 裁判语义判断');
   parts.push('');
 
-  parts.push('## 输出要求');
-  parts.push('返回严格的 JSON（不要 markdown 代码块），格式如下：');
-  parts.push('{');
-  parts.push('  "name": "测试套件名称（中文，简洁描述测试目标）",');
-  parts.push('  "description": "测试套件描述（可选）",');
-  parts.push('  "scenarios": [{');
-  parts.push('    "name": "场景名称",');
-  parts.push('    "steps": [{');
-  parts.push('      "input": "用户输入文本",');
-  parts.push('      "expected": [');
-  parts.push('        {"should_call_tool": "write"},');
-  parts.push('        {"should_produce_file": "hello.txt"},');
-  parts.push('        {"file_content_contains": {"file": "hello.txt", "text": "Hello"}},');
-  parts.push('        {"response_contains": "创建成功"},');
-  parts.push('        {"exec_command": {"command": "echo hello", "expect": {"contains": "hello"}}},');
-  parts.push('        {"judged_by": {"judge": "default", "prompt": "检查文件是否正确创建"}}');
-  parts.push('      ]');
-  parts.push('    }]');
-  parts.push('  }]');
-  parts.push('}');
+  parts.push('【输出格式】仅输出以下 JSON，不要任何解释文字：');
+  parts.push('{"name":"测试名称","description":"可选描述","scenarios":[{"name":"场景名","steps":[{"input":"用户输入原文","expected":[{"断言类型":"断言值"}]}]}]}');
+  parts.push('');
+  parts.push('现在输出 JSON：');
 
   return parts.join('\n');
+}
+
+/** 命令类工具 —— 输入中的 command 字段容易被 LLM 误执行，只展示描述 */
+const COMMAND_TOOLS = new Set(['bash', 'shell', 'exec', 'execute_command']);
+
+function formatToolInput(toolName: string, input: Record<string, unknown>): string {
+  if (COMMAND_TOOLS.has(toolName) && input['description']) {
+    return `[描述: ${input['description']}]`;
+  }
+  return JSON.stringify(input);
 }
 
 function formatStep(step: DistilledStep): string {
@@ -76,7 +83,7 @@ function formatStep(step: DistilledStep): string {
       const statusLabel = tc.error ? `${tc.status} (错误: ${tc.error})` : tc.status;
       lines.push(`  ${i + 1}. ${tc.toolName} [${statusLabel}]`);
       if (Object.keys(tc.input).length > 0) {
-        lines.push(`     输入: ${JSON.stringify(tc.input)}`);
+        lines.push(`     输入: ${formatToolInput(tc.toolName, tc.input)}`);
       }
       if (tc.output) {
         lines.push(`     输出: ${tc.output}`);
