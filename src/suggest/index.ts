@@ -70,8 +70,7 @@ export async function suggest(input: SuggestInput): Promise<string> {
   }
   if (!suite.environments.default) {
     suite.environments.default = {
-      directory: './fixtures/suggested-env',
-      setup: []
+      directory: './fixtures/your-project-dir'
     };
   }
 
