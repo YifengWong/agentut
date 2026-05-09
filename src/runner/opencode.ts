@@ -1,6 +1,9 @@
 // src/runner/opencode.ts
 
 import { execSync } from 'child_process';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import {
   ExecutionError,
   TimeoutError,
@@ -137,15 +140,13 @@ export class OpenCodeRunner implements AgentRunner {
    * @throws ExecutionError 当导出失败时
    */
   async exportSession(sessionId: string): Promise<ExportedSession> {
-    const fullCommand = `${this.command} export ${sessionId}`;
+    const tmpFile = path.join(os.tmpdir(), `agentut-export-${sessionId}.json`);
+    const fullCommand = `${this.command} export ${sessionId} > "${tmpFile}"`;
 
     try {
-      const output = execSync(fullCommand, {
-        encoding: 'utf-8',
-        timeout: 30000
-      });
-
-      return JSON.parse(output) as ExportedSession;
+      execSync(fullCommand, { timeout: 30000 });
+      const content = fs.readFileSync(tmpFile, 'utf-8');
+      return JSON.parse(content) as ExportedSession;
     } catch (error) {
       if (error instanceof Error) {
         throw new ExecutionError(
@@ -154,6 +155,12 @@ export class OpenCodeRunner implements AgentRunner {
         );
       }
       throw new ExecutionError(`Failed to export session ${sessionId}`, fullCommand);
+    } finally {
+      try {
+        fs.unlinkSync(tmpFile);
+      } catch {
+        // Ignore cleanup errors (file may not exist if execSync failed)
+      }
     }
   }
 

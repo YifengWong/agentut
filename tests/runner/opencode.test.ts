@@ -10,7 +10,25 @@ vi.mock('child_process', () => ({
   execSync: vi.fn()
 }));
 
+// Mock fs
+vi.mock('fs', () => ({
+  default: {
+    readFileSync: vi.fn(),
+    unlinkSync: vi.fn()
+  }
+}));
+
+// Mock os
+vi.mock('os', () => ({
+  default: {
+    tmpdir: vi.fn(() => '/tmp')
+  }
+}));
+
+import path from 'path';
 import { execSync } from 'child_process';
+import fs from 'fs';
+import os from 'os';
 
 describe('OpenCodeRunner', () => {
   let runner: OpenCodeRunner;
@@ -243,40 +261,77 @@ describe('OpenCodeRunner', () => {
   });
 
   describe('exportSession', () => {
-    it('should call CLI export with session ID', async () => {
+    it('should redirect export to temp file and parse JSON', async () => {
       const mockSession = {
         info: { id: 'ses_123', directory: '/test' },
         messages: []
       };
-      vi.mocked(execSync).mockReturnValue(JSON.stringify(mockSession));
+      vi.mocked(os.tmpdir).mockReturnValue('/tmp');
+      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(mockSession));
 
       const result = await runner.exportSession('ses_123');
 
+      const expectedTmpPath = path.join('/tmp', 'agentut-export-ses_123.json');
       expect(execSync).toHaveBeenCalledWith(
-        expect.stringContaining('opencode export ses_123'),
-        expect.any(Object)
+        expect.stringContaining(`opencode export ses_123 > "${expectedTmpPath}"`),
+        expect.objectContaining({ timeout: 30000 })
       );
+      expect(fs.readFileSync).toHaveBeenCalledWith(
+        expectedTmpPath,
+        'utf-8'
+      );
+      expect(fs.unlinkSync).toHaveBeenCalledWith(expectedTmpPath);
       expect(result.info.id).toBe('ses_123');
     });
 
     it('should use custom command name', async () => {
       const customRunner = new OpenCodeRunner('mycode');
-      vi.mocked(execSync).mockReturnValue('{}');
+      vi.mocked(os.tmpdir).mockReturnValue('/tmp');
+      vi.mocked(fs.readFileSync).mockReturnValue('{}');
 
       await customRunner.exportSession('ses_123');
 
+      const expectedTmpPath = path.join('/tmp', 'agentut-export-ses_123.json');
       expect(execSync).toHaveBeenCalledWith(
-        expect.stringContaining('mycode export ses_123'),
+        expect.stringContaining(`mycode export ses_123 > "${expectedTmpPath}"`),
         expect.any(Object)
       );
     });
 
-    it('should throw ExecutionError for invalid session ID', async () => {
+    it('should throw ExecutionError when execSync fails', async () => {
+      vi.mocked(os.tmpdir).mockReturnValue('/tmp');
       vi.mocked(execSync).mockImplementation(() => {
         throw new Error('Session not found');
       });
 
       await expect(runner.exportSession('invalid')).rejects.toThrow(ExecutionError);
+    });
+
+    it('should throw ExecutionError when reading temp file fails', async () => {
+      vi.mocked(os.tmpdir).mockReturnValue('/tmp');
+      vi.mocked(fs.readFileSync).mockImplementation(() => {
+        throw new Error('ENOENT: file not found');
+      });
+
+      await expect(runner.exportSession('ses_123')).rejects.toThrow(ExecutionError);
+    });
+
+    it('should clean up temp file even when JSON parse fails', async () => {
+      vi.mocked(os.tmpdir).mockReturnValue('/tmp');
+      vi.mocked(fs.readFileSync).mockReturnValue('not valid json');
+
+      await expect(runner.exportSession('ses_123')).rejects.toThrow(ExecutionError);
+      expect(fs.unlinkSync).toHaveBeenCalledWith(path.join('/tmp', 'agentut-export-ses_123.json'));
+    });
+
+    it('should clean up temp file even when execSync fails', async () => {
+      vi.mocked(os.tmpdir).mockReturnValue('/tmp');
+      vi.mocked(execSync).mockImplementation(() => {
+        throw new Error('Command failed');
+      });
+
+      await expect(runner.exportSession('ses_123')).rejects.toThrow(ExecutionError);
+      expect(fs.unlinkSync).toHaveBeenCalledWith(path.join('/tmp', 'agentut-export-ses_123.json'));
     });
   });
 
