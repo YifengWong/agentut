@@ -171,6 +171,7 @@ expected:
       name: { regex: ".*skill.*" }     # 正则匹配工具名
       input:
         name: { contains: "debug" }    # 包含匹配 input 参数
+      output: { contains: "SUCCESS" }  # 包含匹配 output 结果
       status: completed                 # 状态匹配
 
   - should_produce_file: { regex: ".*\\.json$" }  # 正则匹配文件名
@@ -226,6 +227,7 @@ steps:
 interface ToolCallAssertion {
   name: string | Matcher;                       // 工具名
   input?: Record<string, string | Matcher>;     // input 参数匹配
+  output?: string | Matcher;                    // output 结果匹配
   status?: 'completed' | 'error' | 'pending';   // 状态匹配
 }
 ```
@@ -250,6 +252,11 @@ expected:
       input:
         name: { regex: ".*debugging.*" }
       status: error  # 验证技能调用失败
+
+  # output 匹配 — 验证工具执行结果输出
+  - should_call_tool:
+      name: bash
+      output: { contains: "BUILD SUCCESS" }  # 验证命令输出包含指定文本
 ```
 
 ### 验证结果示例
@@ -268,9 +275,10 @@ Matcher 模式的断言结果会包含实际值，便于调试：
   "actual": {
     "tool": "skill",
     "input": { "name": "writing-plans" },
-    "status": "completed"
+    "status": "completed",
+    "output": "plan written to docs/plans/..."
   },
-  "message": "Found matching tool call: skill(name matches regex '.*writing.*')"
+  "message": "Found matching tool call: skill(name matches regex '.*writing.*'), status='completed'"
 }
 ```
 
