@@ -282,6 +282,161 @@ describe('Verifier', () => {
 
       expect(result.passed).toBe(true);
     });
+
+    it('should support output matching with contains', () => {
+      const outputs: OpenCodeRunOutput[] = [
+        {
+          type: 'tool_use',
+          timestamp: 1,
+          sessionID: 'ses_1',
+          part: {
+            tool: 'bash',
+            state: {
+              status: 'completed',
+              input: { command: 'echo hello' },
+              output: 'BUILD SUCCESS\n'
+            }
+          }
+        }
+      ];
+
+      const result = verifyShouldCallTool(outputs, {
+        name: 'bash',
+        output: { contains: 'BUILD SUCCESS' }
+      });
+
+      expect(result.passed).toBe(true);
+      expect(result.actual?.output).toBe('BUILD SUCCESS\n');
+    });
+
+    it('should support output matching with regex', () => {
+      const outputs: OpenCodeRunOutput[] = [
+        {
+          type: 'tool_use',
+          timestamp: 1,
+          sessionID: 'ses_1',
+          part: {
+            tool: 'bash',
+            state: {
+              status: 'completed',
+              input: {},
+              output: 'Tests: 5 passed, 0 failed'
+            }
+          }
+        }
+      ];
+
+      const result = verifyShouldCallTool(outputs, {
+        name: 'bash',
+        output: { regex: '.*passed.*failed.*' }
+      });
+
+      expect(result.passed).toBe(true);
+    });
+
+    it('should support output matching with string (equals)', () => {
+      const outputs: OpenCodeRunOutput[] = [
+        {
+          type: 'tool_use',
+          timestamp: 1,
+          sessionID: 'ses_1',
+          part: {
+            tool: 'bash',
+            state: {
+              status: 'completed',
+              input: {},
+              output: 'exact match'
+            }
+          }
+        }
+      ];
+
+      const result = verifyShouldCallTool(outputs, {
+        name: 'bash',
+        output: 'exact match'
+      });
+
+      expect(result.passed).toBe(true);
+    });
+
+    it('should fail when output does not match', () => {
+      const outputs: OpenCodeRunOutput[] = [
+        {
+          type: 'tool_use',
+          timestamp: 1,
+          sessionID: 'ses_1',
+          part: {
+            tool: 'bash',
+            state: {
+              status: 'completed',
+              input: {},
+              output: 'actual output'
+            }
+          }
+        }
+      ];
+
+      const result = verifyShouldCallTool(outputs, {
+        name: 'bash',
+        output: { contains: 'BUILD SUCCESS' }
+      });
+
+      expect(result.passed).toBe(false);
+    });
+
+    it('should support output matching combined with status', () => {
+      const outputs: OpenCodeRunOutput[] = [
+        {
+          type: 'tool_use',
+          timestamp: 1,
+          sessionID: 'ses_1',
+          part: {
+            tool: 'bash',
+            state: {
+              status: 'completed',
+              input: { command: 'npm test' },
+              output: 'All tests passed'
+            }
+          }
+        }
+      ];
+
+      const result = verifyShouldCallTool(outputs, {
+        name: 'bash',
+        input: { command: { contains: 'test' } },
+        status: 'completed',
+        output: { contains: 'passed' }
+      });
+
+      expect(result.passed).toBe(true);
+    });
+
+    it('should include output in message description', () => {
+      const outputs: OpenCodeRunOutput[] = [
+        {
+          type: 'tool_use',
+          timestamp: 1,
+          sessionID: 'ses_1',
+          part: {
+            tool: 'bash',
+            state: {
+              status: 'completed',
+              input: {},
+              output: 'Hello World'
+            }
+          }
+        }
+      ];
+
+      const result = verifyShouldCallTool(outputs, {
+        name: 'bash',
+        output: { contains: 'Hello' }
+      });
+
+      expect(result.passed).toBe(true);
+      expect(result.message).toContain('output');
+      expect(result.message).toContain('contains');
+    });
   });
 
   describe('verifyShouldProduceFile', () => {

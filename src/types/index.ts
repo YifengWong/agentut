@@ -58,6 +58,7 @@ export interface Matcher {
 export interface ToolCallAssertion {
   name: string | Matcher;
   input?: Record<string, string | Matcher>;
+  output?: string | Matcher;
   status?: 'completed' | 'error' | 'pending';
   min_pass?: number;  // 概率测试：覆盖场景/全局设置
 }

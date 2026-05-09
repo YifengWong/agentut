@@ -146,13 +146,19 @@ export function verifyShouldCallTool(
       // 验证 status
       if (toolAssertion.status && status !== toolAssertion.status) return false;
 
+      // 验证 output
+      if (toolAssertion.output) {
+        const outputStr = output.part?.state?.output || '';
+        if (!matchValue(outputStr, toolAssertion.output)) return false;
+      }
+
       return true;
     }
 
     // Legacy format (type: "tool_call", data.tool_name)
     if (output.type === 'tool_call' && output.data?.tool_name) {
-      // Legacy format doesn't support input/status matching
-      if (toolAssertion.input || toolAssertion.status) {
+      // Legacy format doesn't support input/status/output matching
+      if (toolAssertion.input || toolAssertion.status || toolAssertion.output) {
         return false;
       }
 
@@ -178,7 +184,8 @@ export function verifyShouldCallTool(
   const actual = matches.length > 0 ? {
     tool: matches[0].part?.tool || matches[0].data?.tool_name,
     input: matches[0].part?.state?.input,
-    status: matches[0].part?.state?.status
+    status: matches[0].part?.state?.status,
+    output: matches[0].part?.state?.output
   } : undefined;
 
   // 构建描述
@@ -189,6 +196,7 @@ export function verifyShouldCallTool(
         .join(', ')
     : '';
   const statusDesc = toolAssertion.status ? `, status='${toolAssertion.status}'` : '';
+  const outputDesc = toolAssertion.output ? `, output ${getMatcherDescription(toolAssertion.output)}` : '';
 
   return {
     type: 'should_call_tool',
@@ -196,8 +204,8 @@ export function verifyShouldCallTool(
     passed,
     actual,
     message: passed
-      ? `Found matching tool call: ${actual?.tool}${inputDesc ? `(${inputDesc})` : ''}${statusDesc}`
-      : `No tool call found with name ${nameDesc}${inputDesc ? `, input ${inputDesc}` : ''}${statusDesc}`
+      ? `Found matching tool call: ${actual?.tool}${inputDesc ? `(${inputDesc})` : ''}${statusDesc}${outputDesc}`
+      : `No tool call found with name ${nameDesc}${inputDesc ? `, input ${inputDesc}` : ''}${statusDesc}${outputDesc}`
   };
 }
 
