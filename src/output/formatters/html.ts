@@ -230,6 +230,7 @@ export function formatAsHtml(result: TestResult): string {
         <span class="status-passed">${result.summary.passed} passed</span>,
         <span class="status-failed">${result.summary.failed} failed</span>
       </div>
+      ${result.total_score !== undefined ? `<div class="summary-item"><strong>Total Score:</strong> ${result.total_score}/100</div>` : ''}
     </div>
 
     <h2>Scenarios</h2>
@@ -286,6 +287,12 @@ function formatScenario(scenario: ScenarioResult): string {
       <div class="meta">
         Environment: ${escapeHtml(scenario.environment)} | Duration: ${scenario.duration_ms}ms
       </div>
+      ${scenario.score ? `
+      <div class="meta">
+        Score: <strong>${scenario.score.score}/100</strong>
+        ${scenario.score.judge ? ` (judge: ${escapeHtml(scenario.score.judge)})` : ' (assertion-based)'}
+        ${scenario.score.reason ? ` - ${escapeHtml(scenario.score.reason)}` : ''}
+      </div>` : ''}
       ${runsInfo ? `<div class="scenario-runs-info">${runsInfo}</div>` : ''}
       ${scenario.error ? `<div class="error"><strong>Error:</strong> ${escapeHtml(scenario.error)}</div>` : ''}
       ${scenario.steps.length > 0 ? `

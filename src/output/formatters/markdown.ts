@@ -20,6 +20,9 @@ export function formatAsMarkdown(result: TestResult): string {
   lines.push(`- **Timestamp:** ${result.summary.timestamp}`);
   lines.push(`- **Duration:** ${result.summary.duration_ms}ms`);
   lines.push(`- **Results:** ✓ ${result.summary.passed} passed, ✗ ${result.summary.failed} failed`);
+  if (result.total_score !== undefined) {
+    lines.push(`- **Total Score:** ${result.total_score}/100`);
+  }
   lines.push('');
 
   // Scenarios
@@ -49,6 +52,13 @@ function formatScenario(scenario: ScenarioResult): string {
   lines.push(`**Status:** ${statusIcon} ${statusText}`);
   lines.push(`**Environment:** ${scenario.environment}`);
   lines.push(`**Duration:** ${scenario.duration_ms}ms`);
+  if (scenario.score) {
+    const scoreLabel = scenario.score.judge ? `(judge: ${scenario.score.judge})` : '(assertion-based)';
+    lines.push(`**Score:** ${scenario.score.score}/100 ${scoreLabel}`);
+    if (scenario.score.reason) {
+      lines.push(`**Score Reason:** ${scenario.score.reason}`);
+    }
+  }
 
   // 多运行时显示汇总统计
   if (scenario.runs !== undefined) {

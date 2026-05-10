@@ -15,6 +15,8 @@ interface JestTestResult {
   name: string;
   duration: number;
   failureMessages: string[];
+  score?: number;
+  scoreReason?: string;
 }
 
 interface JestResults {
@@ -25,6 +27,7 @@ interface JestResults {
   numFailedTests: number;
   numPendingTests: number;
   testResults: JestTestResult[];
+  total_score?: number;
 }
 
 export function formatAsJest(result: TestResult): JestResults {
@@ -39,7 +42,8 @@ export function formatAsJest(result: TestResult): JestResults {
     numPassedTests: result.summary.passed,
     numFailedTests: result.summary.failed,
     numPendingTests: 0,
-    testResults
+    testResults,
+    total_score: result.total_score,
   };
 }
 
@@ -74,6 +78,8 @@ function formatScenarioAsJest(scenario: ScenarioResult): JestTestResult {
     status: scenario.status,
     name: scenario.name,
     duration: scenario.duration_ms,
-    failureMessages
+    failureMessages,
+    score: scenario.score?.score,
+    scoreReason: scenario.score?.reason,
   };
 }

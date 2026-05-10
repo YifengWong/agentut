@@ -324,3 +324,68 @@ describe('formatAsMarkdown (simplified)', () => {
     expect(markdown).toContain('**Environment:** production');
   });
 });
+
+// ========== Score Display Tests ==========
+
+describe('formatAsMarkdown - Score Display', () => {
+  it('should display total score when provided', () => {
+    const result: TestResult = {
+      suite: { name: 'test', description: '', file: './test.yaml' },
+      summary: { total_scenarios: 1, passed: 1, failed: 0, duration_ms: 100, timestamp: '' },
+      total_score: 85,
+      scenarios: []
+    };
+
+    const markdown = formatAsMarkdown(result);
+
+    expect(markdown).toContain('**Total Score:** 85/100');
+  });
+
+  it('should display scenario score when provided', () => {
+    const result: TestResult = {
+      suite: { name: 'test', description: '', file: './test.yaml' },
+      summary: { total_scenarios: 1, passed: 1, failed: 0, duration_ms: 100, timestamp: '' },
+      total_score: 85,
+      scenarios: [
+        {
+          name: 'scored-scenario',
+          environment: 'default',
+          status: 'passed',
+          duration_ms: 100,
+          steps: [],
+          score: { score: 90, reason: 'Good performance', judge: 'gpt-4' }
+        }
+      ]
+    };
+
+    const markdown = formatAsMarkdown(result);
+
+    expect(markdown).toContain('**Score:** 90/100');
+    expect(markdown).toContain('(judge: gpt-4)');
+    expect(markdown).toContain('**Score Reason:** Good performance');
+  });
+
+  it('should display assertion-based score when no judge', () => {
+    const result: TestResult = {
+      suite: { name: 'test', description: '', file: './test.yaml' },
+      summary: { total_scenarios: 1, passed: 1, failed: 0, duration_ms: 100, timestamp: '' },
+      total_score: 100,
+      scenarios: [
+        {
+          name: 'assertion-scored',
+          environment: 'default',
+          status: 'passed',
+          duration_ms: 100,
+          steps: [],
+          score: { score: 100, reason: 'judge score by assertion' }
+        }
+      ]
+    };
+
+    const markdown = formatAsMarkdown(result);
+
+    expect(markdown).toContain('**Score:** 100/100');
+    expect(markdown).toContain('(assertion-based)');
+    expect(markdown).toContain('**Score Reason:** judge score by assertion');
+  });
+});

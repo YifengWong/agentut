@@ -141,3 +141,60 @@ describe('formatAsJest', () => {
     expect(jest.success).toBe(true);
   });
 });
+
+// ========== Score Display Tests ==========
+
+describe('formatAsJest - Score Display', () => {
+  it('should include total_score in top-level result', () => {
+    const result: TestResult = {
+      suite: { name: 'test', description: '', file: './test.yaml' },
+      summary: { total_scenarios: 1, passed: 1, failed: 0, duration_ms: 100, timestamp: '' },
+      total_score: 85,
+      scenarios: [
+        { name: 't1', environment: 'e', status: 'passed', duration_ms: 50, steps: [] }
+      ]
+    };
+
+    const jest = formatAsJest(result);
+
+    expect(jest.total_score).toBe(85);
+  });
+
+  it('should include score and scoreReason in test results', () => {
+    const result: TestResult = {
+      suite: { name: 'test', description: '', file: './test.yaml' },
+      summary: { total_scenarios: 1, passed: 1, failed: 0, duration_ms: 100, timestamp: '' },
+      total_score: 85,
+      scenarios: [
+        {
+          name: 'scored-test',
+          environment: 'e',
+          status: 'passed',
+          duration_ms: 100,
+          steps: [],
+          score: { score: 90, reason: 'Good work', judge: 'gpt-4' }
+        }
+      ]
+    };
+
+    const jest = formatAsJest(result);
+
+    expect(jest.testResults[0].score).toBe(90);
+    expect(jest.testResults[0].scoreReason).toBe('Good work');
+  });
+
+  it('should handle scenario without score gracefully', () => {
+    const result: TestResult = {
+      suite: { name: 'test', description: '', file: './test.yaml' },
+      summary: { total_scenarios: 1, passed: 1, failed: 0, duration_ms: 100, timestamp: '' },
+      scenarios: [
+        { name: 'no-score', environment: 'e', status: 'passed', duration_ms: 100, steps: [] }
+      ]
+    };
+
+    const jest = formatAsJest(result);
+
+    expect(jest.testResults[0].score).toBeUndefined();
+    expect(jest.testResults[0].scoreReason).toBeUndefined();
+  });
+});

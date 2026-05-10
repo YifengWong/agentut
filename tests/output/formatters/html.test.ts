@@ -798,6 +798,74 @@ describe('formatAsHtml - Edge Cases', () => {
   });
 });
 
+// ========== Score Display Tests ==========
+
+describe('formatAsHtml - Score Display', () => {
+  it('should display total score when provided', () => {
+    const result: TestResult = {
+      suite: { name: 'test', description: '', file: './test.yaml' },
+      summary: { total_scenarios: 1, passed: 1, failed: 0, duration_ms: 100, timestamp: '' },
+      total_score: 85,
+      scenarios: []
+    };
+
+    const html = formatAsHtml(result);
+
+    expect(html).toContain('Total Score:');
+    expect(html).toContain('85/100');
+  });
+
+  it('should display scenario score when provided', () => {
+    const result: TestResult = {
+      suite: { name: 'test', description: '', file: './test.yaml' },
+      summary: { total_scenarios: 1, passed: 1, failed: 0, duration_ms: 100, timestamp: '' },
+      total_score: 85,
+      scenarios: [
+        {
+          name: 'scored-scenario',
+          environment: 'default',
+          status: 'passed',
+          duration_ms: 100,
+          steps: [],
+          score: { score: 90, reason: 'Good performance', judge: 'gpt-4' }
+        }
+      ]
+    };
+
+    const html = formatAsHtml(result);
+
+    expect(html).toContain('Score:');
+    expect(html).toContain('<strong>90/100</strong>');
+    expect(html).toContain('Good performance');
+    expect(html).toContain('gpt-4');
+  });
+
+  it('should display assertion-based score when no judge', () => {
+    const result: TestResult = {
+      suite: { name: 'test', description: '', file: './test.yaml' },
+      summary: { total_scenarios: 1, passed: 1, failed: 0, duration_ms: 100, timestamp: '' },
+      total_score: 100,
+      scenarios: [
+        {
+          name: 'assertion-scored',
+          environment: 'default',
+          status: 'passed',
+          duration_ms: 100,
+          steps: [],
+          score: { score: 100, reason: 'All assertions passed' }
+        }
+      ]
+    };
+
+    const html = formatAsHtml(result);
+
+    expect(html).toContain('Score:');
+    expect(html).toContain('<strong>100/100</strong>');
+    expect(html).toContain('assertion-based');
+    expect(html).toContain('All assertions passed');
+  });
+});
+
 // ========== formatSessionOutputHtml Tests ==========
 
 const mockSessionOutput: OpenCodeRunOutput[] = [
