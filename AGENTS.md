@@ -3,6 +3,7 @@
 本文档总结项目架构信息和模块关系，便于后续迭代开发。
 
 **要求：每当新特性、新架构等能力补充时，必须完善`AGENTS.md`以及`README.md`文档**
+**开发文档`docs/`目录禁止提交到git**
 
 ## 项目概述
 
@@ -302,6 +303,86 @@ config:
 ```
 
 验证层自动设置默认值 `{ runner: 'opencode', command: 'opencode' }`。
+
+## 场景评分功能 (2026-05-10)
+
+每个场景执行完毕后自动计算评分。支持两种评分方式：
+
+### AI 裁判评分
+
+用户配置 `score.prompt` + `score.judge`，由 AI 裁判进入场景工作目录评估：
+
+```yaml
+scenarios:
+  - name: my-test
+    score:
+      judge: code-reviewer        # prompt 存在时必填，必须存在于 config.judges
+      prompt: "检查代码质量..."    # 裁判提示词
+      priority: 10               # 权重，默认 10
+      min_score: 70              # 最低分数线，默认 0
+    steps: [...]
+```
+
+裁判必须返回 JSON：`{"score": 85, "reason": "代码结构清晰"}`
+
+### 断言评分（默认）
+
+未设置 `score.prompt` 时，自动基于断言通过率计算得分：
+
+```
+场景得分 = Σ(每个断言的通过次数) / Σ(每个断言的总运行次数) × 100
+```
+
+此时 `score_reason` 固定为 `"judge score by assertion"`。
+
+### 总评分
+
+所有场景按权重加权平均：
+
+```
+总评分 = Σ(场景得分 × priority) / Σ(priority)
+```
+
+默认权重为 10。`total_score` 始终为 0-100 数值，包含在 json/markdown/html/jest 所有输出格式中。
+
+### 通过判定
+
+场景通过需同时满足：所有断言通过 AND 得分 >= min_score。
+
+### 核心类型
+
+```typescript
+interface ScoreConfig {
+  judge?: string;       // prompt 存在时必填
+  prompt?: string;      // 为空 → 断言评分
+  priority?: number;    // 默认 10
+  min_score?: number;   // 默认 0
+}
+
+interface ScoreResult {
+  score: number;         // 0-100
+  reason: string;        // 始终有值
+  judge?: string;        // 使用的裁判名
+}
+
+// ScenarioResult 新增必填字段 score: ScoreResult
+// TestResult 新增必填字段 total_score: number
+```
+
+### 涉及文件
+
+| 文件 | 职责 |
+|------|------|
+| `src/types/index.ts` | `ScoreConfig`、`ScoreResult` 类型定义 |
+| `src/executor/statistics.ts` | `calculateAssertionScore()` 断言评分计算 |
+| `src/executor/verifier.ts` | `evaluateScenarioScore()` AI 裁判评分 |
+| `src/parser/yaml.ts` | score 字段校验（judge 必填检查、priority/min_score 范围） |
+| `src/commands/run.ts` | 场景执行后评分集成、总评分加权计算 |
+| `src/output/logger.ts` | `startScoring()`/`endScoring()` 评分日志 |
+| `src/output/json.ts` | `generateTestResult()` 包含 total_score |
+| `src/output/formatters/html.ts` | HTML 报告展示评分 |
+| `src/output/formatters/markdown.ts` | Markdown 报告展示评分 |
+| `src/output/formatters/jest.ts` | Jest 格式包含评分扩展字段 |
 
 ### Model/Agent 优先级
 
