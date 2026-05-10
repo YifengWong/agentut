@@ -132,6 +132,26 @@ class Logger {
   }
 
   /**
+   * 评分开始 — shows progress indicator
+   */
+  startScoring(scenarioName: string): void {
+    process.stdout.write(`\r[${chalk.gray(scenarioName)}] ${chalk.yellow('⏳')} scoring...`);
+  }
+
+  /**
+   * 评分结束 — clears progress line, prints final score
+   */
+  endScoring(scenarioName: string, score: number, minScore: number, reason: string, isAssertionBased: boolean): void {
+    process.stdout.write('\r\x1b[K'); // Clear the progress line
+    const prefix = `[${chalk.gray(scenarioName)}]`;
+    const passed = score >= minScore;
+    const status = passed ? chalk.green('✓') : chalk.red('✗');
+    const methodLabel = isAssertionBased ? chalk.gray(' (assertion-based)') : '';
+    const reasonText = reason ? ` - ${reason}` : '';
+    console.log(`${prefix} ${status} Score: ${score}/100${methodLabel} (min_score: ${minScore})${reasonText}`);
+  }
+
+  /**
    * 最终汇总
    */
   summary(passed: number, failed: number, totalDurationMs: number): void {
