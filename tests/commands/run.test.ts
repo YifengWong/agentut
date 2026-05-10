@@ -37,7 +37,9 @@ vi.mock('../../src/output/logger.js', () => ({
     endStep: vi.fn(),
     cleanup: vi.fn(),
     error: vi.fn(),
-    summary: vi.fn()
+    summary: vi.fn(),
+    startScoring: vi.fn(),
+    endScoring: vi.fn()
   }
 }));
 

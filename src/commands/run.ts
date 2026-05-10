@@ -4,14 +4,15 @@ import { parseAndValidateYaml } from '../parser/yaml.js';
 import { createRunner } from '../runner/factory.js';
 import { prepareEnvironment } from '../executor/fixture.js';
 import { cleanTempDirectories } from './clean.js';
-import { verifyAssertions } from '../executor/verifier.js';
+import { verifyAssertions, evaluateScenarioScore } from '../executor/verifier.js';
 import { generateTestResult } from '../output/json.js';
 import { logger } from '../output/logger.js';
 import {
   calculateStepSummary,
   calculateAssertionSummaries,
   determineScenarioStatus,
-  calculateAssertionStats
+  calculateAssertionStats,
+  calculateAssertionScore
 } from '../executor/statistics.js';
 import {
   type YamlTestSuite,
@@ -21,6 +22,7 @@ import {
   type RunExecution,
   type RunStepDetail,
   type AssertionStat,
+  type ScoreResult,
   ExecutionError
 } from '../types/index.js';
 
@@ -99,8 +101,24 @@ export async function runTests(
     await cleanTempDirectories(yamlDirectory);
   }
 
+  // Calculate total score (weighted average, all scenarios participate)
+  let totalWeightedScore = 0;
+  let totalWeight = 0;
+  for (let i = 0; i < scenarios.length; i++) {
+    const scenario = scenarios[i];
+    const result = scenarioResults[i];
+    const priority = scenario.score?.priority ?? 10;
+    totalWeightedScore += result.score!.score * priority;
+    totalWeight += priority;
+  }
+  const computedTotalScore = totalWeight > 0
+    ? Math.round(totalWeightedScore / totalWeight)
+    : 0;
+
   // Generate result
   const testResult = generateTestResult(suite, scenarioResults, testPath);
+
+  testResult.total_score = computedTotalScore;
 
   // Write to output file if specified
   if (options.output) {
@@ -423,6 +441,47 @@ async function executeScenario(
 
   const passedRuns = allRunExecutions.filter(r => r.status === 'passed').length;
 
+  // ========== Scoring ==========
+  const effectiveScoreConfig = {
+    judge: scenario.score?.judge,
+    prompt: scenario.score?.prompt,
+    priority: scenario.score?.priority ?? 10,
+    min_score: scenario.score?.min_score ?? 0
+  };
+
+  let scoreResult: ScoreResult;
+  const workDirForJudge = preservedTempDirectory || '';
+
+  if (effectiveScoreConfig.prompt && effectiveScoreConfig.prompt.trim() !== '') {
+    // AI Judge scoring
+    const judgeName = effectiveScoreConfig.judge!;
+    const judgeConfig = suite.config!.judges![judgeName];
+    const judgeTimeout = suite.config?.default_timeout || 120000;
+
+    logger.startScoring(scenario.name);
+    scoreResult = await evaluateScenarioScore(
+      effectiveScoreConfig.prompt,
+      judgeConfig,
+      workDirForJudge,
+      judgeTimeout
+    );
+    logger.endScoring(scenario.name, scoreResult.score, effectiveScoreConfig.min_score, scoreResult.reason, false);
+  } else {
+    // Assertion-based scoring
+    const allAssertionsForScore = scenario.steps.flatMap(step => step.expected);
+    const score = calculateAssertionScore(allRunExecutions, allAssertionsForScore);
+    scoreResult = {
+      score,
+      reason: 'judge score by assertion'
+    };
+    logger.endScoring(scenario.name, scoreResult.score, effectiveScoreConfig.min_score, scoreResult.reason, true);
+  }
+
+  // Apply min_score threshold: if score < min_score, fail the scenario
+  if (scoreResult.score < effectiveScoreConfig.min_score) {
+    finalStatus = 'failed';
+  }
+
   return {
     name: scenario.name,
     environment: scenario.environment,
@@ -430,6 +489,7 @@ async function executeScenario(
     duration_ms: Date.now() - startTime,
     steps: stepResults,
     error: lastError,
+    score: scoreResult,
     tempDirectory: preservedTempDirectory,
     // 概率测试扩展字段：只有在显式配置多运行时才返回这些字段
     runs: !isTraditionalSingleRun ? effectiveRuns : undefined,
