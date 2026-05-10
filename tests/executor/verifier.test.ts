@@ -8,7 +8,8 @@ import {
   verifyFileContentContains,
   verifyResponseContains,
   verifyJudgedBy,
-  verifyExecCommand
+  verifyExecCommand,
+  evaluateScenarioScore
 } from '../../src/executor/verifier.js';
 import { type Assertion, type OpenCodeRunOutput, type StepResult, type AgentCliConfig, type JudgedByAssertion, type ExecCommandAssertion } from '../../src/types/index.js';
 
@@ -1745,5 +1746,88 @@ describe('verifyExecCommand', () => {
     const result = await verifyExecCommand(assertion, workDir, defaultTimeout, yamlDir);
 
     expect(result.passed).toBe(true);
+  });
+});
+
+describe('evaluateScenarioScore', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns ScoreResult when judge returns valid JSON', async () => {
+    vi.mocked(createRunner).mockReturnValue({
+      run: vi.fn().mockReturnValue({
+        sessionId: 'ses_001',
+        outputs: [{ type: 'text', part: { text: '{"score": 85, "reason": "good quality"}' } }]
+      }),
+      runnerType: 'opencode'
+    } as any);
+
+    const result = await evaluateScenarioScore(
+      'check quality',
+      { runner: 'opencode', command: 'myjudge' },
+      '/tmp/workdir',
+      60000
+    );
+
+    expect(result.score).toBe(85);
+    expect(result.reason).toBe('good quality');
+    expect(result.judge).toBe('myjudge');
+  });
+
+  it('returns score=0 when judge throws', async () => {
+    vi.mocked(createRunner).mockReturnValue({
+      run: vi.fn().mockImplementation(() => { throw new Error('timeout'); }),
+      runnerType: 'opencode'
+    } as any);
+
+    const result = await evaluateScenarioScore(
+      'prompt',
+      { runner: 'opencode', command: 'opencode' },
+      '/tmp',
+      1000
+    );
+
+    expect(result.score).toBe(0);
+    expect(result.reason).toContain('timeout');
+  });
+
+  it('returns score=0 when judge output has no valid JSON', async () => {
+    vi.mocked(createRunner).mockReturnValue({
+      run: vi.fn().mockReturnValue({
+        sessionId: 'ses_002',
+        outputs: [{ type: 'text', part: { text: 'just some text' } }]
+      }),
+      runnerType: 'opencode'
+    } as any);
+
+    const result = await evaluateScenarioScore(
+      'prompt',
+      { runner: 'opencode', command: 'opencode' },
+      '/tmp',
+      60000
+    );
+
+    expect(result.score).toBe(0);
+    expect(result.reason).toContain('No valid score result');
+  });
+
+  it('clamps score to 0-100 range', async () => {
+    vi.mocked(createRunner).mockReturnValue({
+      run: vi.fn().mockReturnValue({
+        sessionId: 'ses_003',
+        outputs: [{ type: 'text', part: { text: '{"score": 150, "reason": "perfect"}' } }]
+      }),
+      runnerType: 'opencode'
+    } as any);
+
+    const result = await evaluateScenarioScore(
+      'prompt',
+      { runner: 'opencode', command: 'opencode' },
+      '/tmp',
+      60000
+    );
+
+    expect(result.score).toBe(100);
   });
 });

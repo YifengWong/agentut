@@ -13,7 +13,8 @@ import {
   type ExecCommandAssertion,  // 新增
   type JudgedByAssertion,
   type AgentCliConfig,
-  type GlobalConfig
+  type GlobalConfig,
+  type ScoreResult
 } from '../types/index.js';
 
 /**
@@ -718,5 +719,82 @@ export async function verifyJudgedBy(
     } catch {
       // 清理失败不影响结果
     }
+  }
+}
+
+// ========== Scenario Scoring ==========
+
+const SCORE_OUTPUT_FORMAT_PROMPT = `Please evaluate the scenario. Your response must strictly use the following JSON format, without any other content:
+{"score":number,"reason":"string"}
+
+Where:
+- score: a number between 0 and 100 representing the overall quality
+- reason: brief explanation of the evaluation`;
+
+/**
+ * Extract score from judge text output.
+ */
+function extractScoreResult(outputs: OpenCodeRunOutput[]): { score: number; reason?: string } {
+  for (const output of outputs) {
+    if (output.type === 'text') {
+      const text = output.part?.text || output.data?.content || '';
+
+      // Try direct JSON parse
+      try {
+        const parsed = JSON.parse(text.trim());
+        if (typeof parsed.score === 'number') {
+          return { score: Math.max(0, Math.min(100, Math.round(parsed.score))), reason: parsed.reason };
+        }
+      } catch { /* not pure JSON */ }
+
+      // Try regex extraction: {"score": number, "reason": "string"}
+      const jsonRegex = /\{[^{}]*"score"\s*:\s*(\d+)[^{}]*"reason"\s*:\s*"[^"]*"[^{}]*\}/i;
+      const match = text.trim().match(jsonRegex);
+      if (match) {
+        try {
+          const parsed = JSON.parse(match[0]);
+          if (typeof parsed.score === 'number') {
+            return { score: Math.max(0, Math.min(100, Math.round(parsed.score))), reason: parsed.reason };
+          }
+        } catch { /* not valid */ }
+      }
+    }
+  }
+  return { score: 0, reason: 'No valid score result found in judge output' };
+}
+
+/**
+ * 场景评分 — 启动裁判在场景工作目录执行评分
+ */
+export async function evaluateScenarioScore(
+  prompt: string,
+  judgeConfig: AgentCliConfig,
+  workDir: string,
+  timeout: number
+): Promise<ScoreResult> {
+  const combinedPrompt = `${SCORE_OUTPUT_FORMAT_PROMPT}\n\n${prompt}`;
+
+  try {
+    const runner = createRunner(judgeConfig);
+    const result = runner.run({
+      input: combinedPrompt,
+      directory: workDir,
+      timeout,
+      model: judgeConfig.model,
+      agent: judgeConfig.agent
+    });
+
+    const scoreResult = extractScoreResult(result.outputs);
+    return {
+      score: scoreResult.score,
+      reason: scoreResult.reason || 'OK',
+      judge: judgeConfig.command
+    };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    return {
+      score: 0,
+      reason: `Judge execution error: ${errorMessage}`
+    };
   }
 }
