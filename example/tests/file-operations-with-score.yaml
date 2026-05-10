@@ -1,5 +1,5 @@
-name: file-operations-test
-description: 验证文件操作 Skill 的基本行为
+name: file-operations-with-score
+description: 验证文件操作 Skill 的基本行为（含场景评分）
 
 environments:
   empty:
@@ -14,10 +14,15 @@ environments:
       - copy: "../skills/file-operations/ -> $WORKDIR/.opencode/skills/file-operations/"
 
 scenarios:
-  # 场景 1：创建文件（验证 Write + 文件产生）
+  # 场景 1：创建文件 — AI 裁判评分
   - name: create-file
     environment: empty
     initial_session: ".agentut/my_test_init_session.json"
+    score:
+      judge: simple-judge
+      prompt: "检查测试产物的整体质量：1) hello.txt 文件是否成功创建且内容为 'Hello World'；2) 文件操作流程是否正确（先激活 file-operations 技能，再使用 Write 工具）；3) 整体执行是否完整无遗漏"
+      priority: 10
+      min_score: 60
     steps:
       - input: "使用 'file-operations' 技能，创建 hello.txt 文件，内容为 'Hello World'。"
         expected:
@@ -35,7 +40,7 @@ scenarios:
               judge: simple-judge
               prompt: "检查是否成功创建了 hello.txt 文件，且内容包含 'Hello World'"
 
-  # 场景 2：读取文件（验证 Read + 响应内容）
+  # 场景 2：读取文件 — 默认断言评分（不配置 score）
   - name: read-file
     environment: with-hello
     cleanup: true
@@ -53,10 +58,15 @@ scenarios:
               command: "node -v"
               expect: { contains: "24" }
 
-  # 场景 3：多步骤串联（先创建再读取）
+  # 场景 3：多步骤串联 — AI 裁判评分（高权重）
   - name: create-then-read
     environment: empty
     cleanup: true
+    score:
+      judge: simple-judge
+      prompt: "检查多步骤串联工作流的整体质量：1) 第一步是否正确创建了 hello.txt 且内容为 'Test Content'；2) 第二步是否正确读取了 hello.txt 并返回了 'Test Content'；3) 两步之间的衔接是否流畅无误"
+      priority: 15
+      min_score: 60
     steps:
       - input: "使用 'file-operations' 技能，创建 hello.txt 文件，内容为 'Test Content'"
         expected:
@@ -77,8 +87,8 @@ config:
   runs: 1
   min_pass: 1
   agent_cli:
-    runner: opencode      # Agent 类型 (opencode, claude, gemini)
-    command: opencode       # 实际执行的 CLI 命令名
+    runner: opencode
+    command: opencode
     model: opencode/minimax-m2.5-free
   judges:
     simple-judge:

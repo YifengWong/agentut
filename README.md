@@ -378,6 +378,141 @@ scenarios:
               timeout: 60000
 ```
 
+## 场景评分
+
+Agent UT 在每个场景执行完毕后自动计算评分（0-100），并在所有输出格式中展示场景得分和总评分。
+
+### 两种评分方式
+
+#### 1. AI 裁判评分
+
+当配置了 `score.prompt` 时，场景所有步骤执行完成后，启动指定的 AI 裁判进入场景工作目录进行评估。裁判可直接检查工作目录中的所有产物（文件、代码、构建结果等）。
+
+```yaml
+scenarios:
+  - name: code-quality-test
+    environment: default
+    score:
+      judge: code-reviewer        # prompt 存在时必填，必须存在于 config.judges
+      prompt: "检查生成的代码是否符合项目规范，代码结构是否清晰，是否有适当的注释"
+      priority: 10               # 可选，权重，默认 10
+      min_score: 70              # 可选，最低分数线，默认 0
+    steps:
+      - input: "创建一个排序函数"
+        expected:
+          - should_call_tool: Write
+```
+
+裁判必须返回 JSON 格式：（内置prompt实现）
+```json
+{"score": 85, "reason": "代码结构清晰，但缺少边界情况注释"}
+```
+
+- `score`：0-100 的整数值，超出范围自动修正
+- `reason`：评分理由简述
+
+#### 2. 断言评分（默认）
+
+当**未配置** `score.prompt` 时，自动基于断言结果计算得分。这是默认行为，无需额外配置。
+
+**计算公式：**
+```
+场景得分 = Σ(每个断言的通过次数) / Σ(每个断言的总运行次数) × 100
+```
+
+即所有断言在所有运行中的综合通过率。此时 `score_reason` 固定为 `"judge score by assertion"`。
+
+```yaml
+# 完全不配置 score → 自动断言评分 + 默认权重 10 + 默认 min_score 0
+scenarios:
+  - name: simple-test
+    steps: [...]
+
+# 只调整权重和分数线（仍使用断言评分）
+scenarios:
+  - name: important-test
+    score:
+      priority: 20     # 更高权重
+      min_score: 80    # 更严格的门槛
+    steps: [...]
+```
+
+### 总评分计算
+
+一个 YAML 文件中的所有场景按权重加权平均，得出总评分：
+
+```
+总评分 = Σ(场景得分 × priority) / Σ(priority)
+```
+
+默认权重为 10。总评分始终在 json/markdown/html/jest 所有输出中展示。
+
+### 通过判定
+
+场景通过需**同时满足**两个条件：
+1. **所有断言通过**（现有行为）
+2. **得分 >= min_score**（新增，默认 0 即不设门槛）
+
+### 配置字段说明
+
+| 字段 | 必填 | 默认值 | 说明 |
+|------|------|--------|------|
+| `score.judge` | 条件必填 | - | 仅当 `prompt` 存在时必填，引用 `config.judges` 中的裁判名 |
+| `score.prompt` | 否 | - | 评分提示词。为空/不填 → 使用断言评分 |
+| `score.priority` | 否 | `10` | 权重，用于加权平均计算总评分 |
+| `score.min_score` | 否 | `0` | 最低分数线，得分低于此值场景直接失败 |
+
+### 完整示例
+
+```yaml
+name: scoring-demo
+description: 演示场景评分功能
+
+environments:
+  default:
+    directory: ./fixtures/test-env
+    setup: []
+
+scenarios:
+  # 场景 1：AI 裁判评分
+  - name: code-generation
+    environment: default
+    score:
+      judge: reviewer
+      prompt: "检查代码质量：1) 函数是否正确处理边界情况；2) 是否有注释；3) 命名是否规范"
+      priority: 10
+      min_score: 70
+    steps:
+      - input: "创建一个排序函数"
+        expected:
+          - should_call_tool: Write
+
+  # 场景 2：默认断言评分
+  - name: basic-operations
+    environment: default
+    steps:
+      - input: "读取配置文件"
+        expected:
+          - should_call_tool: Read
+          - response_contains: "config"
+
+config:
+  judges:
+    reviewer:
+      runner: opencode
+      command: opencode
+      model: openai/gpt-4o
+  default_timeout: 120000
+```
+
+**日志输出示例：**
+```
+[code-generation] ⏳ scoring...
+[code-generation] ✓ Score: 85/100 (min_score: 70) - 代码结构清晰，但缺少边界情况注释
+
+[basic-operations] ✓ Score: 100/100 (assertion-based) (min_score: 0) - judge score by assertion
+```
+
 ### 命令执行断言
 
 `exec_command` 断言用于执行外部命令并验证命令输出内容，适用于：
