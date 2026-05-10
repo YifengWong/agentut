@@ -34,7 +34,7 @@ describe('generateTestResult', () => {
       }
     ];
 
-    const result = generateTestResult(suite, scenarioResults, './test.yaml');
+    const result = generateTestResult(suite, scenarioResults, './test.yaml', 85);
 
     expect(result.suite.name).toBe('test-suite');
     expect(result.suite.description).toBe('A test suite');
@@ -43,6 +43,7 @@ describe('generateTestResult', () => {
     expect(result.summary.passed).toBe(1);
     expect(result.summary.failed).toBe(0);
     expect(result.scenarios).toHaveLength(1);
+    expect(result.total_score).toBe(85);
   });
 
   it('should calculate summary correctly', () => {
@@ -60,12 +61,13 @@ describe('generateTestResult', () => {
       { name: 's5', environment: 'e1', status: 'failed', duration_ms: 500, steps: [] }
     ];
 
-    const result = generateTestResult(suite, scenarioResults, './test.yaml');
+    const result = generateTestResult(suite, scenarioResults, './test.yaml', 75);
 
     expect(result.summary.total_scenarios).toBe(5);
     expect(result.summary.passed).toBe(2);
     expect(result.summary.failed).toBe(3);
     expect(result.summary.duration_ms).toBe(1500);
+    expect(result.total_score).toBe(75);
   });
 
   it('should handle empty scenarios', () => {
@@ -81,6 +83,7 @@ describe('generateTestResult', () => {
     expect(result.summary.passed).toBe(0);
     expect(result.summary.failed).toBe(0);
     expect(result.summary.duration_ms).toBe(0);
+    expect(result.total_score).toBe(0);
   });
 
   it('should include error message for failed scenarios', () => {

@@ -116,9 +116,7 @@ export async function runTests(
     : 0;
 
   // Generate result
-  const testResult = generateTestResult(suite, scenarioResults, testPath);
-
-  testResult.total_score = computedTotalScore;
+  const testResult = generateTestResult(suite, scenarioResults, testPath, computedTotalScore);
 
   // Write to output file if specified
   if (options.output) {

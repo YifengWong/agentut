@@ -11,7 +11,8 @@ export function formatTimestamp(date: Date = new Date()): string {
 export function generateTestResult(
   suite: YamlTestSuite,
   scenarioResults: ScenarioResult[],
-  filePath: string
+  filePath: string,
+  totalScore: number = 0
 ): TestResult {
   const passed = scenarioResults.filter(s => s.status === 'passed').length;
   const failed = scenarioResults.filter(s => s.status === 'failed').length;
@@ -30,6 +31,7 @@ export function generateTestResult(
       duration_ms,
       timestamp: formatTimestamp()
     },
-    scenarios: scenarioResults
+    scenarios: scenarioResults,
+    total_score: totalScore
   };
 }
