@@ -28,6 +28,20 @@ export interface ScenarioConfig {
   runs?: number;      // 概率测试：覆盖全局设置
   min_pass?: number;  // 概率测试：覆盖全局设置
   initial_session?: string;  // session 文件路径（相对于 YAML 文件所在目录）
+  score?: ScoreConfig;  // 可选，所有字段有默认值
+}
+
+export interface ScoreConfig {
+  judge?: string;       // 仅当 prompt 存在时必填
+  prompt?: string;      // 为空 → 断言评分
+  priority?: number;    // 默认 10
+  min_score?: number;   // 默认 0
+}
+
+export interface ScoreResult {
+  score: number;         // 0-100，始终有值
+  reason: string;        // 始终有值，断言评分时为 "judge score by assertion"
+  judge?: string;        // 使用的裁判名，断言评分时不填
 }
 
 export interface StepConfig {
@@ -234,6 +248,7 @@ export interface TestResult {
   suite: SuiteInfo;
   summary: TestSummary;
   scenarios: ScenarioResult[];
+  total_score?: number;  // 加权平均总评分，始终存在
 }
 
 export interface SuiteInfo {
@@ -257,6 +272,7 @@ export interface ScenarioResult {
   duration_ms: number;
   steps: StepResult[];
   error?: string;
+  score?: ScoreResult;  // 始终存在
   tempDirectory?: string;
   // 概率测试扩展字段
   runs?: number;
