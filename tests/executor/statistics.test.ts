@@ -4,6 +4,7 @@ import {
   calculateAssertionSummaries,
   determineScenarioStatus,
   calculateAssertionStats,
+  calculateAssertionScore,
   type RunExecutionWithAssertions
 } from '../../src/executor/statistics.js';
 import type { AssertionResult, Assertion, RunExecution } from '../../src/types/index.js';
@@ -389,6 +390,79 @@ describe('statistics module', () => {
       const stats = calculateAssertionStats(runs, [], 1);
 
       expect(stats).toHaveLength(0);
+    });
+  });
+
+  describe('calculateAssertionScore', () => {
+    it('returns 100 when all assertions pass in all runs', () => {
+      const assertions = [
+        { should_call_tool: 'Write' },
+        { should_produce_file: 'test.txt' }
+      ];
+      const runs: RunExecution[] = [
+        { run_index: 0, status: 'passed' as const, duration_ms: 100,
+          steps: [{ step_index: 0, input: 'test', status: 'passed' as const, duration_ms: 100,
+            assertions: [
+              { type: 'should_call_tool', value: 'Write', passed: true },
+              { type: 'should_produce_file', value: 'test.txt', passed: true }
+            ] }] },
+        { run_index: 1, status: 'passed' as const, duration_ms: 100,
+          steps: [{ step_index: 0, input: 'test', status: 'passed' as const, duration_ms: 100,
+            assertions: [
+              { type: 'should_call_tool', value: 'Write', passed: true },
+              { type: 'should_produce_file', value: 'test.txt', passed: true }
+            ] }] }
+      ];
+      expect(calculateAssertionScore(runs, assertions)).toBe(100);
+    });
+
+    it('returns 50 when half assertions pass', () => {
+      const assertions = [
+        { should_call_tool: 'Write' },
+        { should_produce_file: 'test.txt' }
+      ];
+      const runs: RunExecution[] = [
+        { run_index: 0, status: 'passed' as const, duration_ms: 100,
+          steps: [{ step_index: 0, input: 'test', status: 'passed' as const, duration_ms: 100,
+            assertions: [
+              { type: 'should_call_tool', value: 'Write', passed: true },
+              { type: 'should_produce_file', value: 'test.txt', passed: false }
+            ] }] },
+        { run_index: 1, status: 'passed' as const, duration_ms: 100,
+          steps: [{ step_index: 0, input: 'test', status: 'passed' as const, duration_ms: 100,
+            assertions: [
+              { type: 'should_call_tool', value: 'Write', passed: true },
+              { type: 'should_produce_file', value: 'test.txt', passed: false }
+            ] }] }
+      ];
+      expect(calculateAssertionScore(runs, assertions)).toBe(50);
+    });
+
+    it('returns 0 for empty assertions or runs', () => {
+      expect(calculateAssertionScore([], [])).toBe(0);
+      expect(calculateAssertionScore([{ run_index: 0, status: 'passed', duration_ms: 100, steps: [] }], [])).toBe(0);
+    });
+
+    it('handles multi-step scenarios', () => {
+      const assertions = [
+        { should_call_tool: 'Write' },
+        { should_call_tool: 'Read' },
+        { response_contains: 'hello' }
+      ];
+      const runs: RunExecution[] = [
+        { run_index: 0, status: 'passed' as const, duration_ms: 200,
+          steps: [
+            { step_index: 0, input: 'step1', status: 'passed' as const, duration_ms: 100,
+              assertions: [{ type: 'should_call_tool', value: 'Write', passed: true }] },
+            { step_index: 1, input: 'step2', status: 'passed' as const, duration_ms: 100,
+              assertions: [
+                { type: 'should_call_tool', value: 'Read', passed: true },
+                { type: 'response_contains', value: 'hello', passed: false }
+              ] }
+          ] }
+      ];
+      // 2 passed out of 3 total -> 67%
+      expect(calculateAssertionScore(runs, assertions)).toBe(67);
     });
   });
 });

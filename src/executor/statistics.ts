@@ -244,3 +244,40 @@ export function calculateAssertionStats(
 
   return stats;
 }
+
+/**
+ * 基于断言统计计算场景得分（0-100）
+ * score = Σ(each_assertion.passed_runs) / Σ(each_assertion.total_runs) × 100
+ */
+export function calculateAssertionScore(
+  runs: RunExecution[],
+  assertions: Assertion[]
+): number {
+  if (assertions.length === 0 || runs.length === 0) {
+    return 0;
+  }
+
+  let totalPassed = 0;
+  let totalAssertions = 0;
+
+  for (let i = 0; i < assertions.length; i++) {
+    for (const run of runs) {
+      const allAssertions = run.steps
+        ? run.steps.flatMap(s => s.assertions)
+        : (run.assertions || []);
+      const result = allAssertions[i];
+      if (result) {
+        totalAssertions++;
+        if (result.passed) {
+          totalPassed++;
+        }
+      }
+    }
+  }
+
+  if (totalAssertions === 0) {
+    return 0;
+  }
+
+  return Math.round((totalPassed / totalAssertions) * 100);
+}
