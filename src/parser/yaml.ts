@@ -150,6 +150,40 @@ export function validateYamlTestSuite(suite: YamlTestSuite): void {
       }
     }
 
+    // Validate score config (if present)
+    if (scenario.score) {
+      // If prompt is set and non-empty, judge must exist and be valid
+      if (scenario.score.prompt && scenario.score.prompt.trim() !== '') {
+        if (!scenario.score.judge || scenario.score.judge.trim() === '') {
+          throw new ValidationError(
+            `Scenario "${scenario.name}": score.judge is required when score.prompt is set`,
+            `scenarios.${scenario.name}.score.judge`
+          );
+        }
+        if (!suite.config?.judges || !(scenario.score.judge in suite.config.judges)) {
+          throw new ValidationError(
+            `Scenario "${scenario.name}": score.judge "${scenario.score.judge}" not found in config.judges`,
+            `scenarios.${scenario.name}.score.judge`
+          );
+        }
+      }
+
+      if (scenario.score.priority !== undefined && scenario.score.priority <= 0) {
+        throw new ValidationError(
+          `Scenario "${scenario.name}": score.priority must be a positive integer`,
+          `scenarios.${scenario.name}.score.priority`
+        );
+      }
+
+      if (scenario.score.min_score !== undefined &&
+          (scenario.score.min_score < 0 || scenario.score.min_score > 100)) {
+        throw new ValidationError(
+          `Scenario "${scenario.name}": score.min_score must be between 0 and 100`,
+          `scenarios.${scenario.name}.score.min_score`
+        );
+      }
+    }
+
     // Validate assertions in steps
     for (const step of scenario.steps) {
       for (const assertion of step.expected) {

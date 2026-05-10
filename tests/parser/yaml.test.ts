@@ -741,3 +741,163 @@ scenarios:
     expect(result.scenarios[0].initial_session).toBe('.agentut/sessions/base.json');
   });
 });
+
+describe('score validation', () => {
+  it('accepts score with prompt and judge when judge exists in config', () => {
+    const yaml = `
+name: test
+environments:
+  default:
+    directory: ./fixtures/empty
+    setup: []
+config:
+  judges:
+    my-judge:
+      runner: opencode
+      command: opencode
+scenarios:
+  - name: s1
+    environment: default
+    score:
+      judge: my-judge
+      prompt: "evaluate quality"
+    steps:
+      - input: "do something"
+        expected: []
+`;
+    expect(() => parseAndValidateYaml(yaml)).not.toThrow();
+  });
+
+  it('accepts score without prompt (assertion-based)', () => {
+    const yaml = `
+name: test
+environments:
+  default:
+    directory: ./fixtures/empty
+    setup: []
+scenarios:
+  - name: s1
+    environment: default
+    score:
+      priority: 5
+      min_score: 60
+    steps:
+      - input: "do something"
+        expected: []
+`;
+    expect(() => parseAndValidateYaml(yaml)).not.toThrow();
+  });
+
+  it('accepts no score config at all', () => {
+    const yaml = `
+name: test
+environments:
+  default:
+    directory: ./fixtures/empty
+    setup: []
+scenarios:
+  - name: s1
+    environment: default
+    steps:
+      - input: "do something"
+        expected: []
+`;
+    expect(() => parseAndValidateYaml(yaml)).not.toThrow();
+  });
+
+  it('rejects score with prompt but no judge', () => {
+    const yaml = `
+name: test
+environments:
+  default:
+    directory: ./fixtures/empty
+    setup: []
+scenarios:
+  - name: s1
+    environment: default
+    score:
+      prompt: "evaluate"
+    steps:
+      - input: "do something"
+        expected: []
+`;
+    expect(() => parseAndValidateYaml(yaml)).toThrow(/judge/);
+  });
+
+  it('rejects score with prompt and judge not in config.judges', () => {
+    const yaml = `
+name: test
+environments:
+  default:
+    directory: ./fixtures/empty
+    setup: []
+scenarios:
+  - name: s1
+    environment: default
+    score:
+      judge: nonexistent
+      prompt: "evaluate"
+    steps:
+      - input: "do something"
+        expected: []
+`;
+    expect(() => parseAndValidateYaml(yaml)).toThrow(/judge/);
+  });
+
+  it('rejects priority <= 0', () => {
+    const yaml = `
+name: test
+environments:
+  default:
+    directory: ./fixtures/empty
+    setup: []
+scenarios:
+  - name: s1
+    environment: default
+    score:
+      priority: 0
+    steps:
+      - input: "do something"
+        expected: []
+`;
+    expect(() => parseAndValidateYaml(yaml)).toThrow(/priority/);
+  });
+
+  it('rejects min_score < 0', () => {
+    const yaml = `
+name: test
+environments:
+  default:
+    directory: ./fixtures/empty
+    setup: []
+scenarios:
+  - name: s1
+    environment: default
+    score:
+      min_score: -1
+    steps:
+      - input: "do something"
+        expected: []
+`;
+    expect(() => parseAndValidateYaml(yaml)).toThrow(/min_score/);
+  });
+
+  it('rejects min_score > 100', () => {
+    const yaml = `
+name: test
+environments:
+  default:
+    directory: ./fixtures/empty
+    setup: []
+scenarios:
+  - name: s1
+    environment: default
+    score:
+      min_score: 101
+    steps:
+      - input: "do something"
+        expected: []
+`;
+    expect(() => parseAndValidateYaml(yaml)).toThrow(/min_score/);
+  });
+});
