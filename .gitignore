@@ -8,3 +8,5 @@ coverage/
 notes.md
 docs/
 .claude/
+.worktrees/
+claude.md
