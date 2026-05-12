@@ -376,6 +376,7 @@ function formatRunTabContent(run: RunExecution, scenarioId: string, isActive: bo
         <span class="run-info-label">Run Status:</span>
         <span class="run-status-badge ${run.status}">${run.status.toUpperCase()}</span>
         <span class="meta"> | Duration: ${run.duration_ms}ms</span>
+        ${run.score ? `<span class="meta"> | Score: <strong>${run.score.score}/100</strong>${run.score.reason ? ` - ${escapeHtml(run.score.reason)}` : ''}${run.score.judge ? ` (${escapeHtml(run.score.judge)})` : ''}</span>` : ''}
       </div>
       ${run.error ? `<div class="error">${escapeHtml(run.error)}</div>` : ''}
       ${run.steps && run.steps.length > 0 ? `
