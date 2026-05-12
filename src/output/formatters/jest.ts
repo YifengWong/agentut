@@ -65,6 +65,15 @@ function formatScenarioAsJest(scenario: ScenarioResult): JestTestResult {
     }
   }
 
+  // Extract per-run scores
+  const runScores = scenario.runDetails
+    ?.filter(run => run.score)
+    .map(run => ({
+      run_index: run.run_index,
+      score: run.score!.score,
+      reason: run.score!.reason
+    }));
+
   return {
     assertionResults: [{
       ancestorTitles: [],
@@ -82,5 +91,6 @@ function formatScenarioAsJest(scenario: ScenarioResult): JestTestResult {
     failureMessages,
     score: scenario.score?.score,
     scoreReason: scenario.score?.reason,
+    runScores: runScores && runScores.length > 0 ? runScores : undefined,
   };
 }

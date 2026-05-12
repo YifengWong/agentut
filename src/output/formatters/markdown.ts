@@ -83,6 +83,21 @@ function formatScenario(scenario: ScenarioResult): string {
     }
   }
 
+  // Run details table with per-run scores
+  if (scenario.runDetails && scenario.runDetails.length > 0) {
+    lines.push('');
+    lines.push('#### Run Details');
+    lines.push('');
+    lines.push('| Run | Status | Duration | Score | Reason |');
+    lines.push('|-----|--------|----------|-------|--------|');
+    for (const run of scenario.runDetails) {
+      const statusIcon = run.status === 'passed' ? '✓' : '✗';
+      const scoreStr = run.score ? `${run.score.score}` : '-';
+      const reasonStr = run.score?.reason ? escapeMd(run.score.reason) : '-';
+      lines.push(`| ${run.run_index} | ${statusIcon} ${run.status} | ${run.duration_ms}ms | ${scoreStr} | ${reasonStr} |`);
+    }
+  }
+
   lines.push('---');
   lines.push('');
 
@@ -102,4 +117,8 @@ function formatStep(step: StepResult, index: number): string {
   lines.push('');
 
   return lines.join('\n');
+}
+
+function escapeMd(text: string): string {
+  return text.replace(/\|/g, '\\|').replace(/\n/g, ' ');
 }
