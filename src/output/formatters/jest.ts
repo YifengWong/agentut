@@ -17,6 +17,7 @@ interface JestTestResult {
   failureMessages: string[];
   score?: number;
   scoreReason?: string;
+  runScores?: Array<{ run_index: number; score: number; reason: string }>;
 }
 
 interface JestResults {

@@ -325,6 +325,7 @@ export interface RunExecution {
   assertions?: AssertionResult[];  // 保留兼容：旧的汇总断言
   steps?: RunStepDetail[];  // 新增：步骤级详情
   error?: string;
+  score?: ScoreResult;  // 该 run 的评分，AI 模式和断言模式均有值
 }
 
 /**
