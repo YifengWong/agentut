@@ -12,7 +12,8 @@ import {
   calculateAssertionSummaries,
   determineScenarioStatus,
   calculateAssertionStats,
-  calculateAssertionScore
+  calculateAssertionScore,
+  calculatePerRunAssertionScore
 } from '../executor/statistics.js';
 import {
   type YamlTestSuite,
@@ -355,9 +356,43 @@ async function executeScenario(
         steps: runStepDetails,
         error: runError
       };
+
+      // Per-run scoring
+      const hasAiPrompt = scenario.score?.prompt && scenario.score.prompt.trim() !== '';
+      if (hasAiPrompt) {
+        const judgeName = scenario.score!.judge!;
+        const judgeConfig = suite.config!.judges![judgeName];
+        const judgeTimeout = suite.config?.default_timeout || 120000;
+
+        if (effectiveRuns > 1) {
+          logger.startScoring(`${scenario.name} (run ${runIndex + 1}/${effectiveRuns})`);
+        } else {
+          logger.startScoring(scenario.name);
+        }
+        const runScore = await evaluateScenarioScore(
+          scenario.score!.prompt!,
+          judgeConfig,
+          tempDirectory!,
+          judgeTimeout
+        );
+        if (effectiveRuns > 1) {
+          logger.endScoring(`${scenario.name} (run ${runIndex + 1}/${effectiveRuns})`, runScore.score, scenario.score?.min_score ?? 0, runScore.reason, false);
+        } else {
+          logger.endScoring(scenario.name, runScore.score, scenario.score?.min_score ?? 0, runScore.reason, false);
+        }
+        runExecution.score = runScore;
+      } else {
+        // Assertion-based per-run scoring
+        const assertionScore = calculatePerRunAssertionScore(runExecution);
+        runExecution.score = {
+          score: assertionScore,
+          reason: 'judge score by assertion'
+        };
+      }
+
       allRunExecutions.push(runExecution);
 
-      // Preserve temp directory for result (first successful run)
+      // Preserve temp directory for result (first run only, for external reference)
       if (tempDirectory && runIndex === 0) {
         preservedTempDirectory = tempDirectory;
       }
@@ -368,13 +403,19 @@ async function executeScenario(
       }
 
       // 记录失败的运行
-      allRunExecutions.push({
+      const failedRun: RunExecution = {
         run_index: runIndex,
         status: 'failed',
         duration_ms: 0,
         steps: [],
         error: runError
-      });
+      };
+      // Per-run scoring for failed run (assertion-based, score = 0 since no steps)
+      failedRun.score = {
+        score: 0,
+        reason: 'judge score by assertion'
+      };
+      allRunExecutions.push(failedRun);
     }
   }
 
@@ -439,7 +480,7 @@ async function executeScenario(
 
   const passedRuns = allRunExecutions.filter(r => r.status === 'passed').length;
 
-  // ========== Scoring ==========
+  // ========== Scoring: 计算平均分 ==========
   const effectiveScoreConfig = {
     judge: scenario.score?.judge,
     prompt: scenario.score?.prompt,
@@ -447,32 +488,22 @@ async function executeScenario(
     min_score: scenario.score?.min_score ?? 0
   };
 
+  // 收集所有 run 的分数，计算平均
+  const runScores = allRunExecutions.map(r => r.score!.score);
+  const avgScore = Math.round(runScores.reduce((sum, s) => sum + s, 0) / runScores.length);
+
   let scoreResult: ScoreResult;
-  const workDirForJudge = preservedTempDirectory || '';
-
   if (effectiveScoreConfig.prompt && effectiveScoreConfig.prompt.trim() !== '') {
-    // AI Judge scoring
-    const judgeName = effectiveScoreConfig.judge!;
-    const judgeConfig = suite.config!.judges![judgeName];
-    const judgeTimeout = suite.config?.default_timeout || 120000;
-
-    logger.startScoring(scenario.name);
-    scoreResult = await evaluateScenarioScore(
-      effectiveScoreConfig.prompt,
-      judgeConfig,
-      workDirForJudge,
-      judgeTimeout
-    );
-    logger.endScoring(scenario.name, scoreResult.score, effectiveScoreConfig.min_score, scoreResult.reason, false);
-  } else {
-    // Assertion-based scoring
-    const allAssertionsForScore = scenario.steps.flatMap(step => step.expected);
-    const score = calculateAssertionScore(allRunExecutions, allAssertionsForScore);
     scoreResult = {
-      score,
+      score: avgScore,
+      reason: `Average of ${runScores.length} run${runScores.length > 1 ? 's' : ''}`,
+      judge: effectiveScoreConfig.judge
+    };
+  } else {
+    scoreResult = {
+      score: avgScore,
       reason: 'judge score by assertion'
     };
-    logger.endScoring(scenario.name, scoreResult.score, effectiveScoreConfig.min_score, scoreResult.reason, true);
   }
 
   // Apply min_score threshold: if score < min_score, fail the scenario
