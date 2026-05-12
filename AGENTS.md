@@ -304,7 +304,7 @@ config:
 
 验证层自动设置默认值 `{ runner: 'opencode', command: 'opencode' }`。
 
-## 场景评分功能 (2026-05-10)
+## 场景评分功能 (2026-05-10, 更新 2026-05-12)
 
 每个场景执行完毕后自动计算评分。支持两种评分方式：
 
@@ -327,13 +327,28 @@ scenarios:
 
 ### 断言评分（默认）
 
-未设置 `score.prompt` 时，自动基于断言通过率计算得分：
+未设置 `score.prompt` 时，每个 run 自动基于该 run 的断言通过率计算得分：
 
 ```
-场景得分 = Σ(每个断言的通过次数) / Σ(每个断言的总运行次数) × 100
+单 run 得分 = round(该 run 通过的断言数 / 该 run 总断言数 × 100)
 ```
 
 此时 `score_reason` 固定为 `"judge score by assertion"`。
+
+### 多次运行评分 (runs > 1)
+
+当配置了多次运行（`runs > 1`）时，**每个 run 独立评分**：
+
+- **AI 模式**：每个 run 的工作目录被独立评估，各自产生 `{score, reason}`，存入 `RunExecution.score`
+- **断言模式**：每个 run 计算自己的断言通过率，存入 `RunExecution.score`
+
+场景最终得分 = **所有 run 得分的平均值**：
+
+```
+场景得分 = round( Σ(run.score.score) / N )
+```
+
+`min_score` 阈值应用于最终平均分。Per-run 评分信息在 JSON（`runDetails[].score`）、HTML（Run Details tab）、Markdown（Run 详情表格）、Jest（`runScores` 数组）中完整展示。
 
 ### 总评分
 
@@ -365,8 +380,10 @@ interface ScoreResult {
   judge?: string;        // 使用的裁判名
 }
 
-// ScenarioResult 新增必填字段 score: ScoreResult
+// ScenarioResult 新增必填字段 score: ScoreResult（多次运行时为平均值）
 // TestResult 新增必填字段 total_score: number
+// RunExecution 新增可选字段 score?: ScoreResult（per-run 评分）
+// JestTestResult 新增可选字段 runScores?: Array<{run_index, score, reason}>
 ```
 
 ### 涉及文件
@@ -374,10 +391,10 @@ interface ScoreResult {
 | 文件 | 职责 |
 |------|------|
 | `src/types/index.ts` | `ScoreConfig`、`ScoreResult` 类型定义 |
-| `src/executor/statistics.ts` | `calculateAssertionScore()` 断言评分计算 |
+| `src/executor/statistics.ts` | `calculateAssertionScore()` 断言评分计算；`calculatePerRunAssertionScore()` 单 run 断言评分 |
 | `src/executor/verifier.ts` | `evaluateScenarioScore()` AI 裁判评分 |
 | `src/parser/yaml.ts` | score 字段校验（judge 必填检查、priority/min_score 范围） |
-| `src/commands/run.ts` | 场景执行后评分集成、总评分加权计算 |
+| `src/commands/run.ts` | 每 run 循环内评分、平均分计算、总评分加权计算 |
 | `src/output/logger.ts` | `startScoring()`/`endScoring()` 评分日志 |
 | `src/output/json.ts` | `generateTestResult()` 包含 total_score |
 | `src/output/formatters/html.ts` | HTML 报告展示评分 |

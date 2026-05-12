@@ -386,7 +386,7 @@ Agent UT 在每个场景执行完毕后自动计算评分（0-100），并在所
 
 #### 1. AI 裁判评分
 
-当配置了 `score.prompt` 时，场景所有步骤执行完成后，启动指定的 AI 裁判进入场景工作目录进行评估。裁判可直接检查工作目录中的所有产物（文件、代码、构建结果等）。
+当配置了 `score.prompt` 时，**每个 run 独立评分**：裁判进入该 run 的工作目录评估，各 run 产生独立的 `{score, reason}`。
 
 ```yaml
 scenarios:
@@ -415,12 +415,12 @@ scenarios:
 
 当**未配置** `score.prompt` 时，自动基于断言结果计算得分。这是默认行为，无需额外配置。
 
-**计算公式：**
+**计算公式（每个 run）：**
 ```
-场景得分 = Σ(每个断言的通过次数) / Σ(每个断言的总运行次数) × 100
+单 run 得分 = round(该 run 通过的断言数 / 该 run 总断言数 × 100)
 ```
 
-即所有断言在所有运行中的综合通过率。此时 `score_reason` 固定为 `"judge score by assertion"`。
+场景最终得分 = 所有 run 得分的平均值。此时 `score_reason` 固定为 `"judge score by assertion"`。
 
 ```yaml
 # 完全不配置 score → 自动断言评分 + 默认权重 10 + 默认 min_score 0
@@ -446,6 +446,21 @@ scenarios:
 ```
 
 默认权重为 10。总评分始终在 json/markdown/html/jest 所有输出中展示。
+
+### 多次运行评分
+
+当 `runs > 1` 时，每个 run 独立评分并存储在 `RunExecution.score` 中：
+
+- **AI 模式**：每个 run 的 temp 目录被独立裁判评估
+- **断言模式**：每个 run 计算自己的断言通过率
+
+场景最终得分 = **所有 run 得分的平均值**。`min_score` 应用于最终平均分。
+
+Per-run 评分信息展示：
+- **JSON**：`runDetails[].score` 字段
+- **HTML**：Run Details 每个 tab 内显示 `Score: XX/100 - reason`
+- **Markdown**：Run Details 表格含 Score 和 Reason 列
+- **Jest**：`runScores` 数组
 
 ### 通过判定
 

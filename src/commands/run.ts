@@ -12,7 +12,6 @@ import {
   calculateAssertionSummaries,
   determineScenarioStatus,
   calculateAssertionStats,
-  calculateAssertionScore,
   calculatePerRunAssertionScore
 } from '../executor/statistics.js';
 import {
@@ -489,7 +488,7 @@ async function executeScenario(
   };
 
   // 收集所有 run 的分数，计算平均
-  const runScores = allRunExecutions.map(r => r.score!.score);
+  const runScores = allRunExecutions.map(r => r.score?.score ?? 0);
   const avgScore = Math.round(runScores.reduce((sum, s) => sum + s, 0) / runScores.length);
 
   let scoreResult: ScoreResult;
@@ -505,6 +504,10 @@ async function executeScenario(
       reason: 'judge score by assertion'
     };
   }
+
+  // 最终评分日志（用于单次运行时的终端输出）
+  const isAiMode = effectiveScoreConfig.prompt && effectiveScoreConfig.prompt.trim() !== '';
+  logger.endScoring(scenario.name, scoreResult.score, effectiveScoreConfig.min_score, scoreResult.reason, !isAiMode);
 
   // Apply min_score threshold: if score < min_score, fail the scenario
   if (scoreResult.score < effectiveScoreConfig.min_score) {
