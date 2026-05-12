@@ -5,6 +5,7 @@ import {
   determineScenarioStatus,
   calculateAssertionStats,
   calculateAssertionScore,
+  calculatePerRunAssertionScore,
   type RunExecutionWithAssertions
 } from '../../src/executor/statistics.js';
 import type { AssertionResult, Assertion, RunExecution } from '../../src/types/index.js';
@@ -463,6 +464,83 @@ describe('statistics module', () => {
       ];
       // 2 passed out of 3 total -> 67%
       expect(calculateAssertionScore(runs, assertions)).toBe(67);
+    });
+  });
+
+  describe('calculatePerRunAssertionScore', () => {
+    it('should return 100 when all assertions pass', () => {
+      const run: RunExecution = {
+        run_index: 0,
+        status: 'passed',
+        duration_ms: 1000,
+        steps: [
+          {
+            step_index: 0,
+            input: 'test',
+            status: 'passed',
+            duration_ms: 500,
+            assertions: [
+              { type: 'response_contains', value: 'hello', passed: true },
+              { type: 'response_contains', value: 'world', passed: true }
+            ]
+          }
+        ]
+      };
+      expect(calculatePerRunAssertionScore(run)).toBe(100);
+    });
+
+    it('should return 50 when half assertions pass', () => {
+      const run: RunExecution = {
+        run_index: 0,
+        status: 'failed',
+        duration_ms: 1000,
+        steps: [
+          {
+            step_index: 0,
+            input: 'test',
+            status: 'failed',
+            duration_ms: 500,
+            assertions: [
+              { type: 'response_contains', value: 'hello', passed: true },
+              { type: 'response_contains', value: 'world', passed: false }
+            ]
+          }
+        ]
+      };
+      expect(calculatePerRunAssertionScore(run)).toBe(50);
+    });
+
+    it('should return 0 when no assertions', () => {
+      const run: RunExecution = {
+        run_index: 0,
+        status: 'passed',
+        duration_ms: 1000,
+        steps: []
+      };
+      expect(calculatePerRunAssertionScore(run)).toBe(0);
+    });
+
+    it('should round to nearest integer', () => {
+      const run: RunExecution = {
+        run_index: 0,
+        status: 'failed',
+        duration_ms: 1000,
+        steps: [
+          {
+            step_index: 0,
+            input: 'test',
+            status: 'failed',
+            duration_ms: 500,
+            assertions: [
+              { type: 'response_contains', value: 'a', passed: true },
+              { type: 'response_contains', value: 'b', passed: true },
+              { type: 'response_contains', value: 'c', passed: false }
+            ]
+          }
+        ]
+      };
+      // 2/3 * 100 = 66.666... → 67
+      expect(calculatePerRunAssertionScore(run)).toBe(67);
     });
   });
 });

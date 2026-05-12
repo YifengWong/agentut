@@ -281,3 +281,14 @@ export function calculateAssertionScore(
 
   return Math.round((totalPassed / totalAssertions) * 100);
 }
+
+/**
+ * 计算单个 run 的断言评分（该 run 的断言通过率）
+ * score = round(该 run 通过的断言数 / 该 run 总断言数 × 100)
+ */
+export function calculatePerRunAssertionScore(run: RunExecution): number {
+  const assertions = run.steps?.flatMap(s => s.assertions) || [];
+  if (assertions.length === 0) return 0;
+  const passed = assertions.filter(a => a.passed).length;
+  return Math.round((passed / assertions.length) * 100);
+}
