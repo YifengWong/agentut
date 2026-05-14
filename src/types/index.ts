@@ -44,10 +44,21 @@ export interface ScoreResult {
   judge?: string;        // 使用的裁判名，断言评分时不填
 }
 
+/**
+ * Mock 规则 — Step 级别，拦截匹配的工具调用并返回假结果
+ */
+export interface MockRule {
+  tool: string;
+  when?: Record<string, Matcher>[];
+  output?: string;  // 与 error 互斥
+  error?: string;
+}
+
 export interface StepConfig {
   input: string;
   expected: Assertion[];
   timeout?: number;
+  mock?: MockRule[];
 }
 
 // ========== Matcher Types ==========
