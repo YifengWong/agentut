@@ -132,6 +132,13 @@ class Logger {
   }
 
   /**
+   * 警告输出（不影响测试结果，仅提示）
+   */
+  warn(message: string): void {
+    console.log(`${chalk.yellow('⚠')} ${message}`);
+  }
+
+  /**
    * 评分开始 — shows progress indicator
    */
   startScoring(scenarioName: string): void {
