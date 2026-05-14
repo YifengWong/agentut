@@ -901,3 +901,104 @@ scenarios:
     expect(() => parseAndValidateYaml(yaml)).toThrow(/min_score/);
   });
 });
+
+describe('mock rule validation', () => {
+  const baseYaml = `
+name: test-suite
+environments:
+  default:
+    directory: ./test
+    setup: []
+scenarios:
+  - name: s1
+    environment: default
+    cleanup: true
+    steps:
+      - input: "test"
+        expected:
+          - should_call_tool: read
+`;
+
+  it('should accept valid mock rules', () => {
+    const yaml = baseYaml + `
+        mock:
+          - tool: read
+            output: "mocked content"
+`;
+    const result = parseAndValidateYaml(yaml);
+    expect(result.scenarios[0].steps[0].mock).toHaveLength(1);
+    expect(result.scenarios[0].steps[0].mock![0].tool).toBe('read');
+    expect(result.scenarios[0].steps[0].mock![0].output).toBe('mocked content');
+  });
+
+  it('should accept mock rule with when conditions', () => {
+    const yaml = baseYaml + `
+        mock:
+          - tool: read
+            when:
+              - file_path: { contains: ".env" }
+            error: "permission denied"
+`;
+    const result = parseAndValidateYaml(yaml);
+    expect(result.scenarios[0].steps[0].mock![0].when).toHaveLength(1);
+    expect(result.scenarios[0].steps[0].mock![0].when![0]).toEqual({
+      file_path: { contains: '.env' }
+    });
+  });
+
+  it('should accept mock with empty when (match all)', () => {
+    const yaml = baseYaml + `
+        mock:
+          - tool: write
+            output: "ok"
+`;
+    const result = parseAndValidateYaml(yaml);
+    expect(result.scenarios[0].steps[0].mock![0].when).toBeUndefined();
+  });
+
+  it('should reject mock with both output and error', () => {
+    const yaml = baseYaml + `
+        mock:
+          - tool: read
+            output: "ok"
+            error: "fail"
+`;
+    expect(() => parseAndValidateYaml(yaml)).toThrow(ValidationError);
+    expect(() => parseAndValidateYaml(yaml)).toThrow(/mutually exclusive/);
+  });
+
+  it('should reject mock with neither output nor error', () => {
+    const yaml = baseYaml + `
+        mock:
+          - tool: read
+            when:
+              - file_path: { equals: "test" }
+`;
+    expect(() => parseAndValidateYaml(yaml)).toThrow(ValidationError);
+    expect(() => parseAndValidateYaml(yaml)).toThrow(/must specify either/);
+  });
+
+  it('should reject mock without tool', () => {
+    const yaml = baseYaml + `
+        mock:
+          - output: "something"
+`;
+    expect(() => parseAndValidateYaml(yaml)).toThrow(ValidationError);
+    expect(() => parseAndValidateYaml(yaml)).toThrow(/'tool' is required/);
+  });
+
+  it('should accept step without mock field', () => {
+    const result = parseAndValidateYaml(baseYaml);
+    expect(result.scenarios[0].steps[0].mock).toBeUndefined();
+  });
+
+  it('should reject mock with invalid when value (not an array)', () => {
+    const yaml = baseYaml + `
+        mock:
+          - tool: read
+            when: "not-an-array"
+            output: "ok"
+`;
+    expect(() => parseAndValidateYaml(yaml)).toThrow(ValidationError);
+  });
+});

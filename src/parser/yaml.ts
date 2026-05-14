@@ -198,6 +198,58 @@ export function validateYamlTestSuite(suite: YamlTestSuite): void {
         }
       }
 
+      // Validate mock rules (optional, per step)
+      if (step.mock) {
+        if (!Array.isArray(step.mock)) {
+          throw new ValidationError(
+            `Scenario "${scenario.name}": mock must be an array`,
+            `scenarios.${scenario.name}.steps.mock`
+          );
+        }
+
+        for (let ruleIdx = 0; ruleIdx < step.mock.length; ruleIdx++) {
+          const rule = step.mock[ruleIdx];
+          const prefix = `Scenario "${scenario.name}" mock[${ruleIdx}]`;
+
+          // tool 必填且非空
+          if (!rule.tool || typeof rule.tool !== 'string' || rule.tool.trim() === '') {
+            throw new ValidationError(
+              `${prefix}: 'tool' is required`,
+              `scenarios.${scenario.name}.steps.mock.${ruleIdx}.tool`
+            );
+          }
+
+          // output 和 error 至少填一个
+          const hasOutput = rule.output !== undefined && rule.output !== null;
+          const hasError = rule.error !== undefined && rule.error !== null;
+
+          if (!hasOutput && !hasError) {
+            throw new ValidationError(
+              `${prefix}: must specify either 'output' or 'error'`,
+              `scenarios.${scenario.name}.steps.mock.${ruleIdx}`
+            );
+          }
+
+          // output 和 error 互斥
+          if (hasOutput && hasError) {
+            throw new ValidationError(
+              `${prefix}: 'output' and 'error' are mutually exclusive`,
+              `scenarios.${scenario.name}.steps.mock.${ruleIdx}`
+            );
+          }
+
+          // when 如果存在，必须是数组
+          if (rule.when !== undefined) {
+            if (!Array.isArray(rule.when)) {
+              throw new ValidationError(
+                `${prefix}: 'when' must be an array`,
+                `scenarios.${scenario.name}.steps.mock.${ruleIdx}.when`
+              );
+            }
+          }
+        }
+      }
+
       // Set default timeout if not provided
       if (step.timeout === undefined) {
         step.timeout = suite.config?.default_timeout ?? 60000;
