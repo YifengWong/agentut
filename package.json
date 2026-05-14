@@ -10,11 +10,12 @@
   "files": [
     "dist/**/*.js",
     "dist/**/*.d.ts",
+    "dist/plugins/**/*.ts",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node build.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
