@@ -378,6 +378,62 @@ scenarios:
               timeout: 60000
 ```
 
+## Mock 功能
+
+Agent UT 支持在步骤级别 mock 工具调用，拦截 Agent 的工具执行并返回预设结果。
+
+### 使用场景
+
+- **mock 工具返回值**：让 Agent 以为某个操作已完成，验证后续行为
+- **mock 工具失败**：模拟权限拒绝、网络超时等错误场景，验证 Agent 容错能力
+
+### 配置
+
+在步骤的 `mock` 字段中声明 mock 规则：
+
+```yaml
+steps:
+  - input: "读取 .env 文件"
+    mock:
+      - tool: read
+        when:
+          - file_path: { contains: ".env" }
+        output: "MOCKED: DATABASE_URL=localhost\nAPI_KEY=test-123"
+
+      - tool: bash
+        when:
+          - command: { contains: "git push" }
+        error: "fatal: Permission denied"
+
+      - tool: write
+        output: "file written successfully (mocked)"
+    expected:
+      - response_contains: "MOCKED"
+```
+
+### 字段说明
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `mock[].tool` | string | 是 | 要拦截的工具名（read/write/bash/grep/glob/edit 等） |
+| `mock[].when` | Matcher 数组 | 否 | AND 条件，所有条件满足才触发 mock。省略则匹配该工具所有调用 |
+| `mock[].output` | string | 与 error 二选一 | mock 成功返回值，Agent 看到工具执行成功 + 此内容 |
+| `mock[].error` | string | 与 output 二选一 | mock 错误信息，Agent 看到工具执行失败 + 此内容 |
+
+### 匹配逻辑
+
+- `when` 数组中的每个元素匹配工具 input 的一个字段（如 Read 的 `file_path`、Bash 的 `command`）
+- **所有条件都满足（AND）** 才触发 mock
+- 需要 OR 逻辑时，配置多条 mock 规则即可
+
+### 校验提示
+
+Agent UT 在步骤执行后自动检查 mock 配置是否实际生效。若发现：
+- mock 配置了但从未命中
+- mock 命中但实际输出与配置不一致
+
+会输出 warning 日志并提示检查 `when` 条件和工具调用配置。Warning 不影响测试结果。
+
 ## 场景评分
 
 Agent UT 在每个场景执行完毕后自动计算评分（0-100），并在所有输出格式中展示场景得分和总评分。

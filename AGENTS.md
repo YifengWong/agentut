@@ -401,6 +401,58 @@ interface ScoreResult {
 | `src/output/formatters/markdown.ts` | Markdown 报告展示评分 |
 | `src/output/formatters/jest.ts` | Jest 格式包含评分扩展字段 |
 
+## Mock 功能 (2026-05-13)
+
+基于 OpenCode Plugin 机制，在 step 级别实现对 Agent 工具调用的 mock。
+
+### 机制
+
+1. fixture setup 阶段向 `$WORKDIR/.opencode/plugins/` 注入 `agentut-plugins.ts` + `mock-rules.json` + `.mock-empty`
+2. opencode 启动时自动加载插件
+3. `tool.execute.before` 无害化 args，`tool.execute.after` 替换 output
+4. step 执行后 `verifyMockHits()` 校验 mock 是否实际命中
+
+### YAML 配置
+
+```yaml
+steps:
+  - input: "..."
+    mock:
+      - tool: read
+        when:
+          - file_path: { contains: ".env" }
+        output: "MOCKED: SECRET=test"
+      - tool: bash
+        when:
+          - command: { contains: "git push" }
+        error: "Permission denied"
+    expected:
+      - response_contains: "MOCKED"
+```
+
+### 核心类型
+
+```typescript
+interface MockRule {
+  tool: string;
+  when?: Record<string, Matcher>[];
+  output?: string;
+  error?: string;
+}
+```
+
+### 涉及文件
+
+| 文件 | 职责 |
+|------|------|
+| `src/types/index.ts` | `MockRule` 类型定义 |
+| `src/parser/yaml.ts` | mock 字段校验 |
+| `src/executor/fixture.ts` | `injectMockPlugin()` 插件注入 |
+| `src/executor/verifier.ts` | `verifyMockHits()` mock 命中校验 |
+| `src/commands/run.ts` | 集成调用 |
+| `plugins/opencode/agentut-plugins.ts` | OpenCode 插件代码 |
+| `build.js` | 构建后复制插件到 dist |
+
 ### Model/Agent 优先级
 
 **Model 优先级：**
