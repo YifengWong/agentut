@@ -2,9 +2,9 @@ import fs from 'fs-extra';
 import * as path from 'path';
 import { parseAndValidateYaml } from '../parser/yaml.js';
 import { createRunner } from '../runner/factory.js';
-import { prepareEnvironment } from '../executor/fixture.js';
+import { prepareEnvironment, injectMockPlugin } from '../executor/fixture.js';
 import { cleanTempDirectories } from './clean.js';
-import { verifyAssertions, evaluateScenarioScore } from '../executor/verifier.js';
+import { verifyAssertions, evaluateScenarioScore, verifyMockHits } from '../executor/verifier.js';
 import { generateTestResult } from '../output/json.js';
 import { logger } from '../output/logger.js';
 import {
@@ -275,6 +275,11 @@ async function executeScenario(
         logger.showProgress(scenario.name, progressMsg);
 
         try {
+          // Inject mock plugin for this step
+          if (step.mock && step.mock.length > 0) {
+            await injectMockPlugin(tempDirectory, step.mock);
+          }
+
           // Run agent
           const runResult = runner.run({
             input: step.input,
@@ -297,6 +302,11 @@ async function executeScenario(
             tempRoot,      // 新增：传入临时目录根路径
             yamlDirectory  // 新增：传递 YAML 文件目录
           );
+
+          // Verify mock hits
+          if (step.mock && step.mock.length > 0) {
+            verifyMockHits(runResult.outputs, step.mock);
+          }
 
           const stepPassed = assertionResults.every(a => a.passed);
           const stepDuration = Date.now() - stepStartTime;
