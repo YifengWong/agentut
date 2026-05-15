@@ -1,8 +1,10 @@
 import fs from 'fs-extra';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 import { SetupError, ValidationError, type EnvironmentConfig, type SetupAction, type GlobalConfig, type CleanupResult } from '../types/index.js';
+import type { MockRule } from '../types/index.js';
 import { logger } from '../output/logger.js';
 
 interface CopySpec {
@@ -34,6 +36,9 @@ interface PrepareEnvironmentResult {
 function sanitizeDirectoryName(name: string): string {
   return name.replace(/[^a-zA-Z0-9-_]/g, '_');
 }
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PLUGIN_SOURCE = path.resolve(__dirname, '../../plugins/opencode/agentut-plugins.ts');
 
 export async function createTempDirectory(
   scenarioName: string,
@@ -190,4 +195,38 @@ export async function prepareEnvironment(
     logger.endEnvironmentPrep(scenarioName, false, duration);
     throw error;
   }
+}
+
+/**
+ * Inject mock plugin and rules into the working directory's .opencode/plugins/.
+ *
+ * @param workDir - The test working directory ($WORKDIR)
+ * @param mockRules - Mock rules from YAML step config
+ * @returns true if plugin was injected, false if no rules (skipped)
+ */
+export async function injectMockPlugin(
+  workDir: string,
+  mockRules: MockRule[] | undefined
+): Promise<boolean> {
+  if (!mockRules || mockRules.length === 0) {
+    return false;
+  }
+
+  const pluginsDir = path.join(workDir, '.opencode', 'plugins');
+  await fs.ensureDir(pluginsDir);
+
+  // Write mock-rules.json
+  const rulesJson = JSON.stringify({ rules: mockRules }, null, 2);
+  await fs.writeFile(path.join(pluginsDir, 'mock-rules.json'), rulesJson);
+
+  // Copy plugin source
+  const pluginTarget = path.join(pluginsDir, 'agentut-plugins.ts');
+  if (await fs.pathExists(PLUGIN_SOURCE)) {
+    await fs.copy(PLUGIN_SOURCE, pluginTarget);
+  }
+
+  // Create empty file for neutralizing file operations
+  await fs.writeFile(path.join(pluginsDir, '.mock-empty'), '');
+
+  return true;
 }

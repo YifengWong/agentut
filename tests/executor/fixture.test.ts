@@ -7,7 +7,8 @@ import {
   executeSetup,
   cleanupEnvironment,
   prepareEnvironment,
-  parseCopyAction
+  parseCopyAction,
+  injectMockPlugin
 } from '../../src/executor/fixture.js';
 import { SetupError, ValidationError } from '../../src/types/index.js';
 import type { EnvironmentConfig, SetupAction } from '../../src/types/index.js';
@@ -390,5 +391,95 @@ describe('parseCopyAction', () => {
   it('should replace all occurrences of $WORKDIR', () => {
     const result = parseCopyAction('./source -> $WORKDIR/a/$WORKDIR/b', '/workdir');
     expect(result.target).toBe('/workdir/a//workdir/b');
+  });
+});
+
+describe('injectMockPlugin', () => {
+  it('should create .opencode/plugins directory with mock-rules.json', async () => {
+    const workDir = path.join(TEST_TEMP_DIR, 'mock-test-1');
+    await fs.ensureDir(workDir);
+
+    const mockRules = [
+      { tool: 'read', output: 'mocked' },
+      { tool: 'bash', when: [{ command: { contains: 'push' } }], error: 'Permission denied' },
+    ];
+
+    const result = await injectMockPlugin(workDir, mockRules);
+
+    const pluginsDir = path.join(workDir, '.opencode', 'plugins');
+    expect(await fs.pathExists(pluginsDir)).toBe(true);
+    expect(result).toBe(true);
+  });
+
+  it('should write mock-rules.json with correct content', async () => {
+    const workDir = path.join(TEST_TEMP_DIR, 'mock-test-2');
+    await fs.ensureDir(workDir);
+
+    const mockRules = [
+      { tool: 'read', when: [{ file_path: { contains: '.env' } }], output: 'secret' },
+    ];
+
+    await injectMockPlugin(workDir, mockRules);
+
+    const rulesPath = path.join(workDir, '.opencode', 'plugins', 'mock-rules.json');
+    const content = await fs.readFile(rulesPath, 'utf-8');
+    const parsed = JSON.parse(content);
+
+    expect(parsed.rules).toHaveLength(1);
+    expect(parsed.rules[0].tool).toBe('read');
+    expect(parsed.rules[0].output).toBe('secret');
+    expect(parsed.rules[0].when[0]).toEqual({ file_path: { contains: '.env' } });
+  });
+
+  it('should copy agentut-plugins.ts to plugins dir', async () => {
+    const workDir = path.join(TEST_TEMP_DIR, 'mock-test-3');
+    await fs.ensureDir(workDir);
+
+    await injectMockPlugin(workDir, [
+      { tool: 'read', output: 'mocked' }
+    ]);
+
+    const pluginPath = path.join(workDir, '.opencode', 'plugins', 'agentut-plugins.ts');
+    expect(await fs.pathExists(pluginPath)).toBe(true);
+  });
+
+  it('should create .mock-empty file', async () => {
+    const workDir = path.join(TEST_TEMP_DIR, 'mock-test-4');
+    await fs.ensureDir(workDir);
+
+    await injectMockPlugin(workDir, [
+      { tool: 'read', output: 'mocked' }
+    ]);
+
+    const emptyPath = path.join(workDir, '.opencode', 'plugins', '.mock-empty');
+    expect(await fs.pathExists(emptyPath)).toBe(true);
+    const content = await fs.readFile(emptyPath, 'utf-8');
+    expect(content).toBe('');
+  });
+
+  it('should return false when mockRules is empty (no injection needed)', async () => {
+    const workDir = path.join(TEST_TEMP_DIR, 'mock-test-5');
+    await fs.ensureDir(workDir);
+
+    const result = await injectMockPlugin(workDir, []);
+    expect(result).toBe(false);
+  });
+
+  it('should not create any files when rules are empty', async () => {
+    const workDir = path.join(TEST_TEMP_DIR, 'mock-test-6');
+    await fs.ensureDir(workDir);
+
+    await injectMockPlugin(workDir, []);
+
+    const pluginsDir = path.join(workDir, '.opencode', 'plugins');
+    expect(await fs.pathExists(pluginsDir)).toBe(false);
+  });
+
+  it('should handle undefined mockRules gracefully', async () => {
+    const workDir = path.join(TEST_TEMP_DIR, 'mock-test-7');
+    await fs.ensureDir(workDir);
+
+    const result = await injectMockPlugin(workDir, undefined);
+    expect(result).toBe(false);
   });
 });
