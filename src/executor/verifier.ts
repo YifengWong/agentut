@@ -3,6 +3,7 @@ import * as path from 'path';
 import { spawn } from 'child_process';
 import { createRunner } from '../runner/factory.js';
 import { writeTempJson } from './temp-file.js';
+import { logger } from '../output/logger.js';
 import {
   type Assertion,
   type OpenCodeRunOutput,
@@ -14,7 +15,8 @@ import {
   type JudgedByAssertion,
   type AgentCliConfig,
   type GlobalConfig,
-  type ScoreResult
+  type ScoreResult,
+  type MockRule          // NEW
 } from '../types/index.js';
 
 /**
@@ -796,5 +798,77 @@ export async function evaluateScenarioScore(
       score: 0,
       reason: `Judge execution error: ${errorMessage}`
     };
+  }
+}
+
+// ========== Mock Hit Verification ==========
+
+const MOCK_HINT = "Check your mock 'when' conditions and tool call configuration to ensure they align.";
+
+/**
+ * Step 执行完毕后，检查 mock 配置是否实际命中并生效。
+ * 仅输出 warning 日志，不影响测试结果。
+ */
+export function verifyMockHits(
+  outputs: OpenCodeRunOutput[],
+  mockRules: MockRule[]
+): void {
+  for (const rule of mockRules) {
+    const matchedOutputs = outputs.filter(o => {
+      if (o.type !== 'tool_use') return false;
+      if ((o.part?.tool || '').toLowerCase() !== rule.tool.toLowerCase()) return false;
+      if (!rule.when || rule.when.length === 0) return true;
+      const input = o.part?.state?.input as Record<string, unknown> | undefined;
+      if (!input) return false;
+      return rule.when.every(cond =>
+        Object.entries(cond).every(([key, matcher]) =>
+          matchValue(input[key], matcher as Matcher)
+        )
+      );
+    });
+
+    if (matchedOutputs.length === 0) {
+      logger.warn(
+        `Mock rule for '${rule.tool}' was configured but never matched. ${MOCK_HINT}`
+      );
+      continue;
+    }
+
+    for (const output of matchedOutputs) {
+      const state = output.part?.state;
+      const status = state?.status || '';
+      const actualOutput = state?.output || '';
+      const actualError = state?.error || '';
+
+      if (rule.output !== undefined) {
+        if (status !== 'completed') {
+          logger.warn(
+            `Mock mismatch for '${rule.tool}': expected completed status (mock output), got '${status}'. ${MOCK_HINT}`
+          );
+        } else if (actualOutput !== rule.output) {
+          logger.warn(
+            `Mock output mismatch for '${rule.tool}':\n` +
+            `  expected: "${rule.output}"\n` +
+            `  actual:   "${actualOutput}"\n` +
+            `${MOCK_HINT}`
+          );
+        }
+      }
+
+      if (rule.error !== undefined) {
+        if (status !== 'error') {
+          logger.warn(
+            `Mock mismatch for '${rule.tool}': expected error status (mock error), got '${status}'. ${MOCK_HINT}`
+          );
+        } else if (!actualError.includes(rule.error)) {
+          logger.warn(
+            `Mock error mismatch for '${rule.tool}':\n` +
+            `  expected: "${rule.error}"\n` +
+            `  actual:   "${actualError || '(no error)'}"\n` +
+            `${MOCK_HINT}`
+          );
+        }
+      }
+    }
   }
 }

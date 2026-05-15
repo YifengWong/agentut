@@ -9,9 +9,10 @@ import {
   verifyResponseContains,
   verifyJudgedBy,
   verifyExecCommand,
-  evaluateScenarioScore
+  evaluateScenarioScore,
+  verifyMockHits
 } from '../../src/executor/verifier.js';
-import { type Assertion, type OpenCodeRunOutput, type StepResult, type AgentCliConfig, type JudgedByAssertion, type ExecCommandAssertion } from '../../src/types/index.js';
+import { type Assertion, type OpenCodeRunOutput, type StepResult, type AgentCliConfig, type JudgedByAssertion, type ExecCommandAssertion, type MockRule } from '../../src/types/index.js';
 
 // Mock createRunner
 vi.mock('../../src/runner/factory.js', () => ({
@@ -19,6 +20,16 @@ vi.mock('../../src/runner/factory.js', () => ({
 }));
 
 import { createRunner } from '../../src/runner/factory.js';
+
+// Mock logger for verifyMockHits tests
+vi.mock('../../src/output/logger.js', () => ({
+  logger: {
+    warn: vi.fn(),
+  }
+}));
+
+import { logger } from '../../src/output/logger.js';
+const mockedLogger = vi.mocked(logger);
 
 const TEST_TEMP_DIR = './test-temp-verifier';
 
@@ -1829,5 +1840,124 @@ describe('evaluateScenarioScore', () => {
     );
 
     expect(result.score).toBe(100);
+  });
+});
+
+describe('verifyMockHits', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should warn when mock rule is configured but never matched', () => {
+    const outputs: OpenCodeRunOutput[] = [
+      { type: 'tool_use', part: { tool: 'read', state: { status: 'completed', input: { file_path: 'other.txt' }, output: 'other content' } } }
+    ];
+    const mockRules: MockRule[] = [
+      { tool: 'read', when: [{ file_path: { contains: '.env' } }], output: 'secret' }
+    ];
+
+    verifyMockHits(outputs, mockRules);
+    expect(mockedLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('never matched')
+    );
+  });
+
+  it('should not warn when mock rule is matched and output matches', () => {
+    const outputs: OpenCodeRunOutput[] = [
+      { type: 'tool_use', part: { tool: 'read', state: { status: 'completed', input: { file_path: '.env' }, output: 'MOCKED' } } }
+    ];
+    const mockRules: MockRule[] = [
+      { tool: 'read', when: [{ file_path: { contains: '.env' } }], output: 'MOCKED' }
+    ];
+
+    verifyMockHits(outputs, mockRules);
+    expect(mockedLogger.warn).not.toHaveBeenCalled();
+  });
+
+  it('should warn when output content does not match mock', () => {
+    const outputs: OpenCodeRunOutput[] = [
+      { type: 'tool_use', part: { tool: 'read', state: { status: 'completed', input: { file_path: '.env' }, output: 'real content' } } }
+    ];
+    const mockRules: MockRule[] = [
+      { tool: 'read', when: [{ file_path: { contains: '.env' } }], output: 'MOCKED' }
+    ];
+
+    verifyMockHits(outputs, mockRules);
+    expect(mockedLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('output mismatch')
+    );
+  });
+
+  it('should warn when error content does not match mock', () => {
+    const outputs: OpenCodeRunOutput[] = [
+      { type: 'tool_use', part: { tool: 'bash', state: { status: 'error', input: { command: 'git push' }, error: 'different error' } } }
+    ];
+    const mockRules: MockRule[] = [
+      { tool: 'bash', when: [{ command: { contains: 'git push' } }], error: 'Permission denied' }
+    ];
+
+    verifyMockHits(outputs, mockRules);
+    expect(mockedLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('error mismatch')
+    );
+  });
+
+  it('should warn when expected completed but got error status', () => {
+    const outputs: OpenCodeRunOutput[] = [
+      { type: 'tool_use', part: { tool: 'read', state: { status: 'error', input: { file_path: '.env' }, error: 'some error' } } }
+    ];
+    const mockRules: MockRule[] = [
+      { tool: 'read', when: [{ file_path: { contains: '.env' } }], output: 'MOCKED' }
+    ];
+
+    verifyMockHits(outputs, mockRules);
+    expect(mockedLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('expected completed')
+    );
+  });
+
+  it('should warn when expected error but got completed status', () => {
+    const outputs: OpenCodeRunOutput[] = [
+      { type: 'tool_use', part: { tool: 'bash', state: { status: 'completed', input: { command: 'git push' }, output: 'ok' } } }
+    ];
+    const mockRules: MockRule[] = [
+      { tool: 'bash', when: [{ command: { contains: 'git push' } }], error: 'Permission denied' }
+    ];
+
+    verifyMockHits(outputs, mockRules);
+    expect(mockedLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('expected error')
+    );
+  });
+
+  it('should include hint message in every warning', () => {
+    const outputs: OpenCodeRunOutput[] = [
+      { type: 'tool_use', part: { tool: 'read', state: { status: 'error', input: { file_path: '.env' }, error: 'some error' } } }
+    ];
+    const mockRules: MockRule[] = [
+      { tool: 'read', when: [{ file_path: { contains: '.env' } }], output: 'MOCKED' }
+    ];
+
+    verifyMockHits(outputs, mockRules);
+    expect(mockedLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining("Check your mock 'when' conditions")
+    );
+  });
+
+  it('should handle empty mock rules without error', () => {
+    verifyMockHits([], []);
+    expect(mockedLogger.warn).not.toHaveBeenCalled();
+  });
+
+  it('should match without when condition (match all calls of the tool)', () => {
+    const outputs: OpenCodeRunOutput[] = [
+      { type: 'tool_use', part: { tool: 'write', state: { status: 'completed', input: { file_path: 'test.txt' }, output: 'written' } } }
+    ];
+    const mockRules: MockRule[] = [
+      { tool: 'write', output: 'written' }
+    ];
+
+    verifyMockHits(outputs, mockRules);
+    expect(mockedLogger.warn).not.toHaveBeenCalled();
   });
 });
