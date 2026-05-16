@@ -380,12 +380,13 @@ scenarios:
 
 ## Mock 功能
 
-Agent UT 支持在步骤级别 mock 工具调用，拦截 Agent 的工具执行并返回预设结果。
+Agent UT 支持在步骤级别 mock 工具调用。基于 OpenCode Plugin 机制，测试执行时自动向工作目录注入插件，通过 `tool.execute.before` 无害化参数 + `tool.execute.after` 替换返回值，实现对 Agent 工具调用的拦截。
 
 ### 使用场景
 
-- **mock 工具返回值**：让 Agent 以为某个操作已完成，验证后续行为
+- **mock 工具返回值**：拦截 Write/Read/Bash 等工具，返回预设结果，Agent 以为操作已完成，验证后续行为
 - **mock 工具失败**：模拟权限拒绝、网络超时等错误场景，验证 Agent 容错能力
+- **隔离外部依赖**：mock 网络请求、数据库操作、文件系统调用，使测试完全自包含
 
 ### 配置
 
@@ -406,33 +407,95 @@ steps:
         error: "fatal: Permission denied"
 
       - tool: write
+        # 无 when → 匹配该步骤中所有 Write 调用
         output: "file written successfully (mocked)"
     expected:
+      - should_call_tool: read
+      - should_call_tool: bash
+      - should_call_tool: write
       - response_contains: "MOCKED"
 ```
+
+### 完整示例（来自 example/tests/file-operations.yaml 场景 1）
+
+```yaml
+scenarios:
+  - name: create-file
+    environment: empty
+    initial_session: ".agentut/my_test_init_session.json"
+    steps:
+      - input: "使用 'file-operations' 技能，创建 hello.txt 文件，内容为 'Hello World'。再使用mkdir temp命令创建一个temp目录"
+        mock:
+          - tool: write
+            when:
+              - file_path: { contains: "hello.txt" }
+            output: "file written successfully (mocked)"
+          - tool: bash
+            when:
+              - command: { contains: "mkdir" }
+            output: "directory created (mocked)"
+        expected:
+          - should_call_tool: Write
+          - should_call_tool:
+              name: Skill
+              input:
+                name: file-operations
+              status: completed
+          - judged_by:
+              judge: simple-judge
+              prompt: "检查 Agent 是否正确使用了 file-operations 技能来完成创建文件的任务，包括调用了 Skill 和 Write 工具"
+```
+
+这个示例中，Write 工具和 Bash(mkdir) 命令都被 mock 了——文件不会真正写入，目录不会被真正创建，但 Agent 会认为操作成功并继续执行。断言验证 Agent 确实调用了这些工具。
 
 ### 字段说明
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `mock[].tool` | string | 是 | 要拦截的工具名（read/write/bash/grep/glob/edit 等） |
-| `mock[].when` | Matcher 数组 | 否 | AND 条件，所有条件满足才触发 mock。省略则匹配该工具所有调用 |
+| `mock[].when` | Matcher 数组 | 否 | AND 条件数组，每个元素匹配工具 input 的一个字段。所有条件满足才触发 mock。省略则匹配该工具所有调用 |
 | `mock[].output` | string | 与 error 二选一 | mock 成功返回值，Agent 看到工具执行成功 + 此内容 |
 | `mock[].error` | string | 与 output 二选一 | mock 错误信息，Agent 看到工具执行失败 + 此内容 |
 
 ### 匹配逻辑
 
-- `when` 数组中的每个元素匹配工具 input 的一个字段（如 Read 的 `file_path`、Bash 的 `command`）
-- **所有条件都满足（AND）** 才触发 mock
+- `when` 数组中的每个元素匹配工具 input 的一个字段（如 Read 的 `file_path`、Bash 的 `command`、Write 的 `file_path`）
+- **所有条件都满足（AND 逻辑）**才触发 mock
 - 需要 OR 逻辑时，配置多条 mock 规则即可
+- 多条 mock 规则中第一条匹配的生效（短路匹配）
+
+### 工作原理
+
+```
+agentut fixture setup:
+  1. 复制测试环境到临时目录
+  2. 写入 .opencode/plugins/agentut-plugins.ts (插件代码)
+  3. 写入 .opencode/plugins/mock-rules.json  (mock 规则)
+  4. 写入 .opencode/plugins/.mock-empty     (无害化空文件)
+
+opencode 启动:
+  5. 自动加载 .opencode/plugins/ 下的插件
+  6. tool.execute.before: 匹配规则 → 无害化 args（Read→读空文件、Bash→echo mock）
+  7. 工具执行（无害化 args，无副作用）
+  8. tool.execute.after: 命中规则 → 替换 output 为 mock 结果
+  9. Agent 收到 mock 结果，继续后续推理
+```
+
+### Mock 与断言配合
+
+Mock 只控制工具执行结果，不影响断言验证。推荐配合使用：
+
+- **`should_call_tool`**：验证 Agent 确实调用了被 mock 的工具
+- **`response_contains`**：验证 Agent 基于 mock 结果给出了预期响应
+- **`judged_by`**：AI 裁判评估 Agent 在 mock 上下文中的整体行为
 
 ### 校验提示
 
 Agent UT 在步骤执行后自动检查 mock 配置是否实际生效。若发现：
-- mock 配置了但从未命中
-- mock 命中但实际输出与配置不一致
+- mock 配置了但从未命中（`when` 条件未匹配到任何工具调用）
+- mock 命中但实际 output/error 与配置不一致
 
-会输出 warning 日志并提示检查 `when` 条件和工具调用配置。Warning 不影响测试结果。
+会输出 `⚠ warning` 日志并提示检查 `when` 条件和工具调用配置。Warning 不影响测试结果，仅作为诊断辅助。
 
 ## 场景评分
 
