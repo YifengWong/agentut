@@ -37,13 +37,6 @@ export class OpenCodeRunner implements AgentRunner {
   run(options: RunOptions): RunResult {
     const args = [`${this.command} run`];
 
-    // Add the input message (escaped, including newlines for multi-line prompts)
-    // Replace newlines with escaped \n to preserve multi-line content in shell
-    const escapedInput = options.input
-      .replace(/"/g, '\\"')
-      .replace(/\n/g, '\\n');
-    args.push(`"${escapedInput}"`);
-
     // Add directory for first step
     if (options.directory) {
       args.push(`--dir "${options.directory}"`);
@@ -82,6 +75,7 @@ export class OpenCodeRunner implements AgentRunner {
 
     try {
       const output = execSync(fullCommand, {
+        input: options.input,
         encoding: 'utf-8',
         timeout,
         maxBuffer: 10 * 1024 * 1024, // 10MB

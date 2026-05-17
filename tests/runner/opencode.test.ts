@@ -232,16 +232,19 @@ describe('OpenCodeRunner', () => {
       expect(result.sessionId).toBe('ses_new_format');
     });
 
-    it('should escape quotes in input', () => {
+    it('should pass input via stdin (input option)', () => {
       vi.mocked(execSync).mockReturnValue('{}');
 
       runner.run({
         input: 'Say "hello" to the user'
       });
 
+      // prompt no longer appears in command string — goes through stdin
       expect(execSync).toHaveBeenCalledWith(
-        expect.stringContaining('Say \\"hello\\" to the user'),
-        expect.any(Object)
+        expect.not.stringContaining('Say'),
+        expect.objectContaining({
+          input: 'Say "hello" to the user'
+        })
       );
     });
 
