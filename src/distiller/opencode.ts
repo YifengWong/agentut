@@ -1,6 +1,6 @@
-import type { ExportedSession, Message } from '../types/index.js';
-import type { SessionDistiller, DistilledSession, DistilledStep, FileChange } from './types.js';
-import { extractToolInfo, truncateOutput } from './extract.js';
+import type { ExportedSession, Message, OpenCodeRunOutput } from '../types/index.js';
+import type { SessionDistiller, DistilledSession, DistilledStep, DistilledToolCall, FileChange } from './types.js';
+import { extractText, extractToolInfo, truncateOutput } from './extract.js';
 
 const MAX_REASONING_LENGTH = 200;
 
@@ -87,6 +87,53 @@ export class OpenCodeDistiller implements SessionDistiller {
     };
   }
 
+  /**
+   * 从 OpenCodeRunOutput[] 直接蒸馏为 DistilledSession
+   * 将整个 outputs 数组当作一个步骤处理
+   */
+  distillOutputs(outputs: OpenCodeRunOutput[], workingDir: string = ''): DistilledSession {
+    const toolCalls: DistilledToolCall[] = [];
+    const textResponses: string[] = [];
+    let lastTextResponse: string | undefined;
+
+    for (const output of outputs) {
+      // 提取文本响应
+      if (output.type === 'text') {
+        const text = extractText(output);
+        if (text) {
+          textResponses.push(text);
+          lastTextResponse = text;
+        }
+      }
+
+      // 提取工具调用
+      if (output.type === 'tool_use') {
+        const info = extractToolInfo(output);
+        if (info) {
+          toolCalls.push({
+            toolName: info.toolName,
+            status: info.status,
+            input: info.input,
+            output: truncateOutput(info.toolName, info.input, info.output),
+            error: info.error,
+          });
+        }
+      }
+    }
+
+    return {
+      workingDirectory: workingDir,
+      title: '',
+      steps: [{
+        index: 1,
+        userInput: '',
+        toolCalls,
+        assistantResponse: lastTextResponse,
+        fileChanges: [],
+      }]
+    };
+  }
+
   private extractFileChanges(message: Message, seenFiles: Set<string>): FileChange[] {
     const changes: FileChange[] = [];
     const diffs = message.info.summary?.diffs;
@@ -105,4 +152,46 @@ export class OpenCodeDistiller implements SessionDistiller {
     }
     return changes;
   }
+}
+
+/**
+ * 将 DistilledSession 格式化为嵌入 judge prompt 的精炼文本
+ * 只输出事实描述，不含任何指令
+ */
+export function formatForJudge(session: DistilledSession): string {
+  const parts: string[] = [];
+  parts.push('---');
+  parts.push('');
+  parts.push('## Step Execution Summary');
+  parts.push('');
+
+  for (const step of session.steps) {
+    // 文本响应
+    if (step.assistantResponse) {
+      parts.push('### Agent Response');
+      parts.push(step.assistantResponse);
+      parts.push('');
+    }
+
+    // 工具调用
+    if (step.toolCalls.length > 0) {
+      parts.push('### Tool Calls');
+      for (let i = 0; i < step.toolCalls.length; i++) {
+        const tc = step.toolCalls[i];
+        const inputSummary = Object.keys(tc.input).length > 0
+          ? ` → ${JSON.stringify(tc.input)}`
+          : '';
+        parts.push(`${i + 1}. **${tc.toolName}**${inputSummary}`);
+        if (tc.output) {
+          parts.push(`   Output: ${tc.output}`);
+        }
+        if (tc.error) {
+          parts.push(`   Error: ${tc.error}`);
+        }
+      }
+      parts.push('');
+    }
+  }
+
+  return parts.join('\n');
 }
