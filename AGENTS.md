@@ -275,7 +275,7 @@ import * as fs from 'fs-extra';
 | `should_produce_file` | 检查工作目录是否存在该文件 |
 | `file_content_contains` | 读取文件，检查内容包含指定文本 |
 | `response_contains` | 检查 outputs 中 type=text 的 data.content |
-| `exec_command` | 执行命令，检查输出（stdout+stderr）是否匹配 Matcher |
+| `exec_command` | 执行命令，检查输出（stdout+stderr）是否匹配 Matcher（equals/contains/containsOneOf/regex/oneOf） |
 
 ### 临时目录命名
 

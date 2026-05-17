@@ -181,6 +181,7 @@ expected:
       text: { regex: ".*apiKey.*" }
 
   - response_contains: { oneOf: ["success", "done", "完成"] }
+  - response_contains: { containsOneOf: ["success", "completed", "通过"] }
 ```
 
 ### Matcher 类型
@@ -191,10 +192,11 @@ expected:
 | `contains` | 包含匹配（字符串） | `{ contains: "debugging" }` |
 | `regex` | 正则表达式匹配 | `{ regex: ".*skill.*" }` |
 | `oneOf` | 候选值匹配（任意一个） | `{ oneOf: ["success", "done"] }` |
+| `containsOneOf` | 包含任一个子串 | `{ containsOneOf: ["success", "error"] }` |
 
 **简写规则：**
 - 字符串值自动推断为 `{ equals: value }`
-- Matcher 对象只有一个字段有效，按优先级：equals > contains > regex > oneOf
+- Matcher 对象只有一个字段有效，按优先级：equals > contains > containsOneOf > regex > oneOf
 
 ### 多技能激活断言
 
@@ -670,7 +672,7 @@ expected:
 | 字段 | 类型 | 必填 | 默认值 | 说明 |
 |------|------|------|--------|------|
 | `command` | string | 是 | - | 要执行的命令 |
-| `expect` | Matcher | 是 | - | 输出匹配条件，支持 equals/contains/regex/oneOf |
+| `expect` | Matcher | 是 | - | 输出匹配条件，支持 equals/contains/containsOneOf/regex/oneOf |
 | `timeout` | number | 否 | global.default_timeout | 命令执行超时（毫秒） |
 | `cwd` | string | 否 | 场景工作目录 | 执行目录，相对路径基于 YAML 文件 |
 
