@@ -67,6 +67,33 @@ describe('matchValue', () => {
     });
   });
 
+  describe('containsOneOf matcher', () => {
+    it('should match if any substring is found', () => {
+      expect(matchValue('task success', { containsOneOf: ['success', 'error', 'done'] })).toBe(true);
+      expect(matchValue('Build error occurred', { containsOneOf: ['success', 'error'] })).toBe(true);
+      expect(matchValue('task completed', { containsOneOf: ['success', 'error'] })).toBe(false);
+    });
+
+    it('should work with single element', () => {
+      expect(matchValue('debugging skill', { containsOneOf: ['skill'] })).toBe(true);
+      expect(matchValue('debugging tool', { containsOneOf: ['skill'] })).toBe(false);
+    });
+
+    it('should be case sensitive', () => {
+      expect(matchValue('SUCCESS', { containsOneOf: ['success'] })).toBe(false);
+      expect(matchValue('task Success', { containsOneOf: ['Success'] })).toBe(true);
+    });
+
+    it('should return false for empty array', () => {
+      expect(matchValue('anything', { containsOneOf: [] })).toBe(false);
+    });
+
+    it('should convert non-string to string', () => {
+      expect(matchValue(12345, { containsOneOf: ['234'] })).toBe(true);
+      expect(matchValue(12345, { containsOneOf: ['999'] })).toBe(false);
+    });
+  });
+
   describe('priority', () => {
     it('should check equals first when multiple fields present', () => {
       // 实际实现会按优先级检查
@@ -100,6 +127,10 @@ describe('getMatcherDescription', () => {
 
   it('should describe oneOf matcher', () => {
     expect(getMatcherDescription({ oneOf: ['a', 'b'] })).toBe("one of [a, b]");
+  });
+
+  it('should describe containsOneOf matcher', () => {
+    expect(getMatcherDescription({ containsOneOf: ['err', 'fail'] })).toBe("contains any of [err, fail]");
   });
 
   it('should handle empty matcher', () => {
