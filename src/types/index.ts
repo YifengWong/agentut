@@ -67,12 +67,14 @@ export interface StepConfig {
  * Matcher 对象支持多种匹配模式
  * - equals: 精确匹配
  * - contains: 包含匹配（字符串）
+ * - containsOneOf: 包含任一个子串（字符串）
  * - regex: 正则匹配
  * - oneOf: 候选值匹配
  */
 export interface Matcher {
   equals?: string;
   contains?: string;
+  containsOneOf?: string[];
   regex?: string;
   oneOf?: string[];
 }
