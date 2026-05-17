@@ -378,11 +378,17 @@ async function executeScenario(
         } else {
           logger.startScoring(scenario.name);
         }
+        // 收集该 run 所有步骤的 outputs
+        const allStepOutputs = runStepDetails
+          .filter(s => s.actual_output)
+          .flatMap(s => s.actual_output!);
+
         const runScore = await evaluateScenarioScore(
           scenario.score!.prompt!,
           judgeConfig,
           tempDirectory!,
-          judgeTimeout
+          judgeTimeout,
+          allStepOutputs
         );
         if (effectiveRuns > 1) {
           logger.endScoring(`${scenario.name} (run ${runIndex + 1}/${effectiveRuns})`, runScore.score, scenario.score?.min_score ?? 0, runScore.reason, false);

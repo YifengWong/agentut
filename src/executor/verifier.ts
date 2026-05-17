@@ -761,9 +761,17 @@ export async function evaluateScenarioScore(
   prompt: string,
   judgeConfig: AgentCliConfig,
   workDir: string,
-  timeout: number
+  timeout: number,
+  stepOutputs?: OpenCodeRunOutput[]
 ): Promise<ScoreResult> {
-  const combinedPrompt = `${SCORE_OUTPUT_FORMAT_PROMPT}\n\n${prompt}`;
+  let combinedPrompt = `${SCORE_OUTPUT_FORMAT_PROMPT}\n\n${prompt}`;
+
+  // If step outputs were provided, distill and embed them
+  if (stepOutputs && stepOutputs.length > 0) {
+    const distiller = new OpenCodeDistiller();
+    const distilled = distiller.distillOutputs(stepOutputs, workDir);
+    combinedPrompt += `\n\n${formatForJudge(distilled)}`;
+  }
 
   try {
     const runner = createRunner(judgeConfig);
