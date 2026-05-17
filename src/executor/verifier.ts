@@ -2,7 +2,7 @@ import fs from 'fs-extra';
 import * as path from 'path';
 import { spawn } from 'child_process';
 import { createRunner } from '../runner/factory.js';
-import { writeTempJson } from './temp-file.js';
+import { OpenCodeDistiller, formatForJudge } from '../distiller/opencode.js';
 import { logger } from '../output/logger.js';
 import {
   type Assertion,
@@ -667,21 +667,13 @@ export async function verifyJudgedBy(
     };
   }
 
-  // 2. 写入临时文件
-  let tempFile: string;
-  try {
-    tempFile = await writeTempJson(outputs, tempRoot);
-  } catch (err) {
-    return {
-      type: 'judged_by',
-      value: assertion,
-      passed: false,
-      message: `Failed to write temp file: ${err instanceof Error ? err.message : 'Unknown error'}`
-    };
-  }
+  // 2. 蒸馏步骤输出
+  const distiller = new OpenCodeDistiller();
+  const distilled = distiller.distillOutputs(outputs, judgeDir);
+  const stepSummary = formatForJudge(distilled);
 
-  // 3. 组合 prompt（内置格式引导 + 用户 prompt）
-  const combinedPrompt = `${JUDGE_OUTPUT_FORMAT_PROMPT}\n\n${assertion.prompt}`;
+  // 3. 组合 prompt（格式引导 + 用户 prompt + 步骤摘要）
+  const combinedPrompt = `${JUDGE_OUTPUT_FORMAT_PROMPT}\n\n${assertion.prompt}\n\n${stepSummary}`;
 
   // 4. 创建 Runner 并执行
   const runner = createRunner(judgeConfig);
@@ -690,10 +682,10 @@ export async function verifyJudgedBy(
   try {
     const result = runner.run({
       input: combinedPrompt,
-      directory: judgeDir,  // AI裁判运行在场景临时目录
+      directory: judgeDir,
       timeout,
-      model: judgeConfig.model,    // 传递 judge 配置的 model
-      agent: judgeConfig.agent     // 传递 judge 配置的 agent
+      model: judgeConfig.model,
+      agent: judgeConfig.agent
     });
 
     // 5. 解析裁判输出
@@ -718,14 +710,6 @@ export async function verifyJudgedBy(
       passed: false,
       message: `Judge '${judgeName}' execution error: ${errorMessage}`
     };
-
-  } finally {
-    // 6. 清理临时文件
-    try {
-      await fs.remove(tempFile);
-    } catch {
-      // 清理失败不影响结果
-    }
   }
 }
 
