@@ -31,7 +31,7 @@ function isString(value: unknown): value is string {
  */
 function isMatcher(value: unknown): value is Matcher {
   return typeof value === 'object' && value !== null &&
-    ('equals' in value || 'contains' in value || 'regex' in value || 'oneOf' in value);
+    ('equals' in value || 'contains' in value || 'containsOneOf' in value || 'regex' in value || 'oneOf' in value);
 }
 
 /**
@@ -77,6 +77,10 @@ export function matchValue(actual: unknown, matcher: string | Matcher | undefine
     return actualStr.includes(matcher.contains);
   }
 
+  if (matcher.containsOneOf !== undefined) {
+    return matcher.containsOneOf.some(sub => actualStr.includes(sub));
+  }
+
   if (matcher.regex !== undefined) {
     try {
       return new RegExp(matcher.regex).test(actualStr);
@@ -106,6 +110,7 @@ export function getMatcherDescription(matcher: string | Matcher | undefined): st
 
   if (matcher.equals !== undefined) return `equals '${matcher.equals}'`;
   if (matcher.contains !== undefined) return `contains '${matcher.contains}'`;
+  if (matcher.containsOneOf !== undefined) return `contains any of [${matcher.containsOneOf.join(', ')}]`;
   if (matcher.regex !== undefined) return `matches regex '${matcher.regex}'`;
   if (matcher.oneOf !== undefined) return `one of [${matcher.oneOf.join(', ')}]`;
 
