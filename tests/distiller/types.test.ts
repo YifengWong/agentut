@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 describe('Distiller types', () => {
   it('should be importable', async () => {
-    const mod = await import('../../../src/distiller/types.js');
+    const mod = await import('../../src/distiller/types.js');
     expect(mod).toBeDefined();
   });
 

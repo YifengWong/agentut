@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { OpenCodeDistiller } from '../../../src/distiller/opencode.js';
-import type { ExportedSession } from '../../../src/types/index.js';
+import { OpenCodeDistiller, formatForJudge } from '../../src/distiller/opencode.js';
+import type { ExportedSession, OpenCodeRunOutput } from '../../src/types/index.js';
+import type { DistilledSession } from '../../src/distiller/types.js';
 
 function makeSession(overrides: Partial<ExportedSession> = {}): ExportedSession {
   return {
@@ -254,5 +255,69 @@ describe('OpenCodeDistiller', () => {
     const result = distiller.distill(session);
     expect(result.steps[0].toolCalls).toHaveLength(1);
     expect(result.steps[0].toolCalls[0].toolName).toBe('write');
+  });
+});
+
+describe('distillOutputs', () => {
+  const distiller = new OpenCodeDistiller();
+
+  it('should distill OpenCodeRunOutput[] into DistilledSession', () => {
+    const outputs = [
+      { type: 'text', part: { text: '我来创建文件' } },
+      {
+        type: 'tool_use',
+        part: {
+          tool: 'write',
+          state: {
+            status: 'completed',
+            input: { filePath: 'hello.txt', content: 'Hello World' },
+            output: 'File written successfully'
+          }
+        }
+      },
+      { type: 'text', part: { text: '文件创建成功！' } }
+    ] as OpenCodeRunOutput[];
+
+    const session = distiller.distillOutputs(outputs, '/tmp/work');
+    expect(session.steps).toHaveLength(1);
+    expect(session.steps[0].toolCalls).toHaveLength(1);
+    expect(session.steps[0].toolCalls[0].toolName).toBe('write');
+    expect(session.steps[0].assistantResponse).toBe('文件创建成功！');
+  });
+
+  it('should handle empty outputs', () => {
+    const session = distiller.distillOutputs([], '/tmp');
+    expect(session.steps).toHaveLength(1);
+    expect(session.steps[0].toolCalls).toHaveLength(0);
+  });
+});
+
+describe('formatForJudge', () => {
+  it('should format DistilledSession as structured text', () => {
+    const session: DistilledSession = {
+      workingDirectory: '/tmp/test',
+      title: '',
+      steps: [{
+        index: 1,
+        userInput: '',
+        toolCalls: [{
+          toolName: 'bash',
+          status: 'completed',
+          input: { command: 'npm test' },
+          output: 'Tests passed',
+        }],
+        assistantResponse: '测试通过',
+        fileChanges: [],
+      }]
+    };
+
+    const text = formatForJudge(session);
+    expect(text).toContain('## Step Execution Summary');
+    expect(text).toContain('### Agent Response');
+    expect(text).toContain('测试通过');
+    expect(text).toContain('### Tool Calls');
+    expect(text).toContain('**bash**');
+    expect(text).toContain('npm test');
+    expect(text).toContain('Tests passed');
   });
 });

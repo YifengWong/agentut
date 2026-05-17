@@ -1419,7 +1419,7 @@ describe('verifyJudgedBy', () => {
     );
   });
 
-  it('should pass outputs to temp file and runner', async () => {
+  it('should embed distilled step outputs in judge prompt', async () => {
     const mockRunner = {
       runnerType: 'opencode',
       run: vi.fn().mockReturnValue({
@@ -1436,7 +1436,7 @@ describe('verifyJudgedBy', () => {
 
     const outputs: OpenCodeRunOutput[] = [
       { type: 'text', part: { text: 'Output 1' } },
-      { type: 'tool_use', part: { tool: 'write' } }
+      { type: 'tool_use', part: { tool: 'write', state: { status: 'completed', input: { filePath: 'hello.txt' }, output: 'done' } } }
     ];
 
     const assertion: JudgedByAssertion = {
@@ -1450,14 +1450,18 @@ describe('verifyJudgedBy', () => {
       mockJudges,
       defaultTimeout,
       tempRoot,
-      tempRoot  // judgeDir - AI裁判运行目录
+      tempRoot
     );
 
-    // Verify run was called with directory option (runs in tempDirectory)
     const runCall = mockRunner.run.mock.calls[0][0];
     expect(runCall.directory).toBe(tempRoot);
+    // Verify prompt contains user prompt AND step summary
     expect(runCall.input).toContain('Evaluate outputs');
-    expect(runCall.input).toContain('{"passed":boolean');
+    expect(runCall.input).toContain('## Step Execution Summary');
+    expect(runCall.input).toContain('### Tool Calls');
+    expect(runCall.input).toContain('write');
+    // Verify no -f flag used (no temp file)
+    expect(runCall.file).toBeUndefined();
   });
 
   it('should extract judge result from data.content (legacy format)', async () => {
@@ -1491,73 +1495,6 @@ describe('verifyJudgedBy', () => {
 
     expect(result.passed).toBe(true);
     expect(result.actual?.reason).toBe('Legacy format works');
-  });
-
-  it('should cleanup temp file after execution', async () => {
-    const mockRunner = {
-      runnerType: 'opencode',
-      run: vi.fn().mockReturnValue({
-        outputs: [
-          { type: 'text', part: { text: '{"passed":true,"reason":"OK"}' } }
-        ],
-        sessionId: 'judge-session-8'
-      }),
-      exportSession: vi.fn(),
-      listSessions: vi.fn()
-    };
-
-    vi.mocked(createRunner).mockReturnValue(mockRunner as any);
-
-    const assertion: JudgedByAssertion = {
-      judge: 'test-judge',
-      prompt: 'Test'
-    };
-
-    await verifyJudgedBy(
-      [],
-      assertion,
-      mockJudges,
-      defaultTimeout,
-      tempRoot
-    );
-
-    // Get the temp file path from the runner call
-    const runCall = mockRunner.run.mock.calls[0][0];
-    const tempFile = runCall.file;
-    const fileExists = await fs.pathExists(tempFile);
-    expect(fileExists).toBe(false);
-  });
-
-  it('should cleanup temp file even when execution fails', async () => {
-    const mockRunner = {
-      runnerType: 'opencode',
-      run: vi.fn().mockImplementation(() => {
-        throw new Error('Execution failed');
-      }),
-      exportSession: vi.fn(),
-      listSessions: vi.fn()
-    };
-
-    vi.mocked(createRunner).mockReturnValue(mockRunner as any);
-
-    const assertion: JudgedByAssertion = {
-      judge: 'test-judge',
-      prompt: 'Test'
-    };
-
-    await verifyJudgedBy(
-      [],
-      assertion,
-      mockJudges,
-      defaultTimeout,
-      tempRoot
-    );
-
-    // Get the temp file path from the runner call
-    const runCall = mockRunner.run.mock.calls[0][0];
-    const tempFile = runCall.file;
-    const fileExists = await fs.pathExists(tempFile);
-    expect(fileExists).toBe(false);
   });
 
   it('should pass model from judge config to runner', async () => {
