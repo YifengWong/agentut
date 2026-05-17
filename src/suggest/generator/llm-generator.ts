@@ -1,6 +1,6 @@
 import type { AgentRunner, RunOptions } from '../../runner/types.js';
 import type { YamlTestSuite } from '../../types/index.js';
-import type { DistilledSession } from '../distiller/types.js';
+import type { DistilledSession } from '../../distiller/types.js';
 import { buildPrompt, parseResponse } from './prompt.js';
 
 export interface GeneratorOptions {

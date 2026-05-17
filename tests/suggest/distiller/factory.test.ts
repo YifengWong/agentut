@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { createDistiller } from '../../../src/suggest/distiller/factory.js';
-import { OpenCodeDistiller } from '../../../src/suggest/distiller/opencode.js';
+import { createDistiller } from '../../../src/distiller/factory.js';
+import { OpenCodeDistiller } from '../../../src/distiller/opencode.js';
 
 describe('createDistiller', () => {
   it('should create OpenCodeDistiller for "opencode"', () => {

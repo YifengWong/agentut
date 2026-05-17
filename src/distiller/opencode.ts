@@ -1,4 +1,4 @@
-import type { ExportedSession, Part, Message } from '../../types/index.js';
+import type { ExportedSession, Part, Message } from '../types/index.js';
 import type { SessionDistiller, DistilledSession, DistilledStep, DistilledToolCall, FileChange } from './types.js';
 
 const MAX_OUTPUT_LENGTH = 500;

@@ -1,4 +1,4 @@
-import { createDistiller } from './distiller/factory.js';
+import { createDistiller } from '../distiller/factory.js';
 import { generateAssertions } from './generator/llm-generator.js';
 import { generateYamlFromAnalysis, analyzeSession } from '../parser/session.js';
 import * as yaml from 'yaml';

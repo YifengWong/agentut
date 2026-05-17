@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { OpenCodeDistiller } from '../../../src/suggest/distiller/opencode.js';
+import { OpenCodeDistiller } from '../../../src/distiller/opencode.js';
 import type { ExportedSession } from '../../../src/types/index.js';
 
 function makeSession(overrides: Partial<ExportedSession> = {}): ExportedSession {

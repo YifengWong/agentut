@@ -1,4 +1,4 @@
-import type { DistilledSession, DistilledStep } from '../distiller/types.js';
+import type { DistilledSession, DistilledStep } from '../../distiller/types.js';
 import type { YamlTestSuite } from '../../types/index.js';
 
 export class MalformedResponseError extends Error {

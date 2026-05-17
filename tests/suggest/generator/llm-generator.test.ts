@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { generateAssertions } from '../../../src/suggest/generator/llm-generator.js';
-import type { DistilledSession } from '../../../src/suggest/distiller/types.js';
+import type { DistilledSession } from '../../../src/distiller/types.js';
 
 function makeSession(steps: DistilledSession['steps'] = []): DistilledSession {
   return {

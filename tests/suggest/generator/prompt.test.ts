@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildPrompt, parseResponse, MalformedResponseError } from '../../../src/suggest/generator/prompt.js';
-import type { DistilledSession } from '../../../src/suggest/distiller/types.js';
+import type { DistilledSession } from '../../../src/distiller/types.js';
 
 function makeDistilledSession(overrides: Partial<DistilledSession> = {}): DistilledSession {
   return {
