@@ -1,8 +1,22 @@
-import type { ExportedSession, Part, Message } from '../types/index.js';
-import type { SessionDistiller, DistilledSession, DistilledStep, DistilledToolCall, FileChange } from './types.js';
+import type { ExportedSession, Message } from '../types/index.js';
+import type { SessionDistiller, DistilledSession, DistilledStep, FileChange } from './types.js';
+import { extractToolInfo, truncateOutput } from './extract.js';
 
-const MAX_OUTPUT_LENGTH = 500;
 const MAX_REASONING_LENGTH = 200;
+
+function extractUserInputFromMessage(message: Message): string {
+  for (const part of message.parts) {
+    if (part.type === 'text' && part.text) {
+      let text = part.text.trim();
+      if ((text.startsWith('"') && text.endsWith('"')) ||
+          (text.startsWith("'") && text.endsWith("'"))) {
+        text = text.slice(1, -1);
+      }
+      return text;
+    }
+  }
+  return '';
+}
 
 export class OpenCodeDistiller implements SessionDistiller {
   readonly runnerType = 'opencode';
@@ -22,7 +36,7 @@ export class OpenCodeDistiller implements SessionDistiller {
         }
 
         stepIndex++;
-        const userInput = this.extractUserInput(message);
+        const userInput = extractUserInputFromMessage(message);
         const fileChanges = this.extractFileChanges(message, seenFiles);
 
         currentStep = {
@@ -43,7 +57,16 @@ export class OpenCodeDistiller implements SessionDistiller {
           }
 
           if (part.type === 'tool' && part.tool) {
-            currentStep.toolCalls.push(this.extractToolCall(part));
+            const info = extractToolInfo(part);
+            if (info) {
+              currentStep.toolCalls.push({
+                toolName: info.toolName,
+                status: info.status,
+                input: info.input,
+                output: truncateOutput(info.toolName, info.input, info.output),
+                error: info.error,
+              });
+            }
           }
 
           if (part.type === 'text' && part.text && part.text.trim()) {
@@ -62,46 +85,6 @@ export class OpenCodeDistiller implements SessionDistiller {
       title: session.info.title,
       steps
     };
-  }
-
-  private extractUserInput(message: Message): string {
-    for (const part of message.parts) {
-      if (part.type === 'text' && part.text) {
-        let text = part.text.trim();
-        if ((text.startsWith('"') && text.endsWith('"')) ||
-            (text.startsWith("'") && text.endsWith("'"))) {
-          text = text.slice(1, -1);
-        }
-        return text;
-      }
-    }
-    return '';
-  }
-
-  private extractToolCall(part: Part): DistilledToolCall {
-    const p = part as unknown as {
-      tool?: string;
-      state?: {
-        status?: string;
-        input?: Record<string, unknown>;
-        output?: string;
-        error?: string;
-      };
-    };
-
-    const toolName = p.tool || 'unknown';
-    const status = (p.state?.status as DistilledToolCall['status']) || 'completed';
-    const input = p.state?.input || {};
-    let output = p.state?.output;
-    const error = p.state?.error;
-
-    if (toolName === 'skill' && input['name']) {
-      output = `[Loaded skill: ${input['name']}]`;
-    } else if (output && output.length > MAX_OUTPUT_LENGTH) {
-      output = output.slice(0, MAX_OUTPUT_LENGTH) + '...';
-    }
-
-    return { toolName, status, input, output, error };
   }
 
   private extractFileChanges(message: Message, seenFiles: Set<string>): FileChange[] {
