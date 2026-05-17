@@ -239,6 +239,26 @@ describe('Verifier', () => {
       expect(result.passed).toBe(true);
     });
 
+    it('should support containsOneOf matcher', () => {
+      const outputs: OpenCodeRunOutput[] = [
+        {
+          type: 'tool_use',
+          part: {
+            tool: 'Skill',
+            state: {
+              status: 'completed',
+              input: { name: 'debugging-skill' },
+            },
+          },
+        } as OpenCodeRunOutput,
+      ];
+
+      const result = verifyShouldCallTool(outputs, {
+        name: { containsOneOf: ['kill', 'bug'] }
+      });
+      expect(result.passed).toBe(true);
+    });
+
     it('should match multiple tool calls independently', () => {
       const outputs: OpenCodeRunOutput[] = [
         {
@@ -498,6 +518,13 @@ describe('Verifier', () => {
       expect(result.passed).toBe(true);
     });
 
+    it('should support containsOneOf matcher', async () => {
+      await fs.writeFile(path.join(TEST_TEMP_DIR, 'error.log'), 'some error content');
+
+      const result = await verifyShouldProduceFile(TEST_TEMP_DIR, { containsOneOf: ['error', 'crash'] });
+      expect(result.passed).toBe(true);
+    });
+
     it('should support contains matcher', async () => {
       await fs.writeFile(path.join(TEST_TEMP_DIR, 'test-output.txt'), 'content');
 
@@ -718,6 +745,20 @@ describe('Verifier', () => {
 
       const result = verifyResponseContains(outputs, { oneOf: ['success', 'completed', 'done'] });
 
+      expect(result.passed).toBe(true);
+    });
+
+    it('should support containsOneOf matcher', () => {
+      const outputs: OpenCodeRunOutput[] = [
+        {
+          type: 'text',
+          part: {
+            text: 'Build completed successfully',
+          },
+        } as OpenCodeRunOutput,
+      ];
+
+      const result = verifyResponseContains(outputs, { containsOneOf: ['success', 'completed', 'done'] });
       expect(result.passed).toBe(true);
     });
 
@@ -1705,6 +1746,16 @@ describe('verifyExecCommand', () => {
 
     const result = await verifyExecCommand(assertion, workDir, defaultTimeout, yamlDir);
 
+    expect(result.passed).toBe(true);
+  });
+
+  it('should support containsOneOf matcher', async () => {
+    const assertion: ExecCommandAssertion = {
+      command: 'printf "build success"',
+      expect: { containsOneOf: ['build', 'done', 'passing'] }
+    };
+
+    const result = await verifyExecCommand(assertion, workDir, defaultTimeout, yamlDir);
     expect(result.passed).toBe(true);
   });
 
