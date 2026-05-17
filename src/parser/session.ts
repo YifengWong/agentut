@@ -6,7 +6,7 @@ import type {
 } from '../types/index.js';
 
 /**
- * @deprecated Use SessionDistiller from src/suggest/distiller/ for new code.
+ * @deprecated Use SessionDistiller from src/distiller/ for new code.
  */
 export function analyzeSession(session: ExportedSession): SessionAnalysis {
   const inputs: string[] = [];
@@ -62,7 +62,7 @@ export function analyzeSession(session: ExportedSession): SessionAnalysis {
 }
 
 /**
- * @deprecated Use SessionDistiller from src/suggest/distiller/ for new code.
+ * @deprecated Use SessionDistiller from src/distiller/ for new code.
  */
 export function generateYamlFromAnalysis(analysis: SessionAnalysis): YamlTestSuite {
   const steps: StepConfig[] = [];
