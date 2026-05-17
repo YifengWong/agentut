@@ -17,6 +17,7 @@ import type { Plugin, PluginInput } from "@opencode-ai/plugin";
 interface MatcherObj {
   equals?: string;
   contains?: string;
+  containsOneOf?: string[];
   regex?: string;
   oneOf?: string[];
 }
@@ -25,6 +26,7 @@ function matchValue(actual: unknown, matcher: MatcherObj): boolean {
   const actualStr = String(actual ?? "");
   if (matcher.equals !== undefined) return actual === matcher.equals;
   if (matcher.contains !== undefined) return actualStr.includes(matcher.contains);
+  if (matcher.containsOneOf !== undefined) return matcher.containsOneOf.some(sub => actualStr.includes(sub));
   if (matcher.regex !== undefined) {
     try { return new RegExp(matcher.regex).test(actualStr); }
     catch { return false; }
