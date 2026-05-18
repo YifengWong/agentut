@@ -154,12 +154,20 @@ export default (async function agentutPlugin(input: PluginInput): Promise<Record
         output.metadata ??= {};
         output.metadata._agentutOriginalInput = entry.originalArgs;
 
+        const argsSummary = Object.entries(entry.originalArgs)
+          .map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`)
+          .join(', ');
+
         if (entry.rule.output !== undefined) {
           output.output = entry.rule.output;
-          output.title = `${ctx.tool} (mocked)`;
+          output.metadata.output = entry.rule.output;
+          output.title = `${ctx.tool} (mocked) | ${argsSummary}`;
         } else if (entry.rule.error !== undefined) {
           output.output = entry.rule.error;
-          output.title = `${ctx.tool} (mock error)`;
+          output.metadata.output = entry.rule.error;
+          output.metadata.error = entry.rule.error;
+          output.metadata.status = "error";
+          output.title = `${ctx.tool} (mock error) | ${argsSummary}`;
         }
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
