@@ -293,22 +293,24 @@ async function executeScenario(
 
           sessionId = runResult.sessionId;
 
-          // Normalize mocked tool inputs: restore original LLM args from metadata
-          normalizeMockedToolInputs(runResult.outputs);
+          // Clone outputs for assertion (normalized) while keeping raw for report
+          const rawOutputs = runResult.outputs;
+          const normalizedOutputs = structuredClone(runResult.outputs);
+          normalizeMockedToolInputs(normalizedOutputs);
 
-          // Verify assertions
+          // Verify assertions using normalized outputs (LLM original args)
           const assertionResults = await verifyAssertions(
             step.expected,
-            runResult.outputs,
+            normalizedOutputs,
             tempDirectory,
             suite.config,  // 新增：传入全局配置
             tempRoot,      // 新增：传入临时目录根路径
             yamlDirectory  // 新增：传递 YAML 文件目录
           );
 
-          // Verify mock hits
+          // Verify mock hits (uses normalized outputs for correct matching)
           if (step.mock && step.mock.length > 0) {
-            verifyMockHits(runResult.outputs, step.mock);
+            verifyMockHits(normalizedOutputs, step.mock);
           }
 
           const stepPassed = assertionResults.every(a => a.passed);
@@ -320,7 +322,7 @@ async function executeScenario(
             status: stepPassed ? 'passed' : 'failed',
             duration_ms: stepDuration,
             assertions: assertionResults,
-            actual_output: runResult.outputs
+            actual_output: rawOutputs
           };
 
           runStepDetails.push(stepDetail);
