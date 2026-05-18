@@ -121,14 +121,17 @@ export default (async function agentutPlugin(input: PluginInput): Promise<Record
   }
 
   const rules = loadRules();
-  const hitMap = new Map<string, MockRule>();
+  const hitMap = new Map<string, { rule: MockRule; originalArgs: Record<string, unknown> }>();
 
   return {
     "tool.execute.before": async (ctx: { tool: string; sessionID: string; callID: string }, output: { args: Record<string, unknown> }): Promise<void> => {
       try {
         const matched = matchRule(ctx.tool, output.args, rules);
         if (!matched) return;
-        hitMap.set(ctx.callID, matched);
+
+        const originalArgs = JSON.parse(JSON.stringify(output.args));
+        hitMap.set(ctx.callID, { rule: matched, originalArgs });
+
         const neutralized = neutralizeArgs(ctx.tool, output.args, emptyFile);
         if (!neutralized) {
           await log("warn",
@@ -144,15 +147,17 @@ export default (async function agentutPlugin(input: PluginInput): Promise<Record
 
     "tool.execute.after": async (ctx: { tool: string; sessionID: string; callID: string; args: Record<string, unknown> }, output: { title: string; output: string; metadata: Record<string, unknown> }): Promise<void> => {
       try {
-        const rule = hitMap.get(ctx.callID);
-        if (!rule) return;
+        const entry = hitMap.get(ctx.callID);
+        if (!entry) return;
         hitMap.delete(ctx.callID);
 
-        if (rule.output !== undefined) {
-          output.output = rule.output;
+        output.metadata._agentutOriginalInput = entry.originalArgs;
+
+        if (entry.rule.output !== undefined) {
+          output.output = entry.rule.output;
           output.title = `${ctx.tool} (mocked)`;
-        } else if (rule.error !== undefined) {
-          output.output = rule.error;
+        } else if (entry.rule.error !== undefined) {
+          output.output = entry.rule.error;
           output.title = `${ctx.tool} (mock error)`;
         }
       } catch (e: unknown) {
