@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'fs-extra';
 import * as path from 'path';
 import {
+  normalizeMockedToolInputs,
   verifyAssertions,
   verifyShouldCallTool,
   verifyShouldProduceFile,
@@ -1945,6 +1946,184 @@ describe('verifyMockHits', () => {
       { tool: 'write', output: 'written' }
     ];
 
+    verifyMockHits(outputs, mockRules);
+    expect(mockedLogger.warn).not.toHaveBeenCalled();
+  });
+});
+
+describe('normalizeMockedToolInputs', () => {
+  it('should restore original args from metadata and delete marker', () => {
+    const outputs: OpenCodeRunOutput[] = [
+      {
+        type: 'tool_use',
+        part: {
+          tool: 'write',
+          callID: 'call_1',
+          state: {
+            status: 'completed',
+            input: { file_path: '.mock-empty' },
+            output: 'file written (mocked)',
+            metadata: {
+              _agentutOriginalInput: { file_path: '/real/path/hello.txt', content: 'world' }
+            }
+          }
+        }
+      }
+    ];
+
+    normalizeMockedToolInputs(outputs);
+
+    expect(outputs[0].part!.state!.input).toEqual({
+      file_path: '/real/path/hello.txt',
+      content: 'world'
+    });
+    expect(outputs[0].part!.state!.metadata!._agentutOriginalInput).toBeUndefined();
+  });
+
+  it('should not modify outputs without mock metadata', () => {
+    const outputs: OpenCodeRunOutput[] = [
+      {
+        type: 'tool_use',
+        part: {
+          tool: 'read',
+          callID: 'call_2',
+          state: {
+            status: 'completed',
+            input: { file_path: '/some/file.txt' },
+            output: 'file contents'
+          }
+        }
+      }
+    ];
+
+    normalizeMockedToolInputs(outputs);
+
+    expect(outputs[0].part!.state!.input).toEqual({ file_path: '/some/file.txt' });
+  });
+
+  it('should not modify non-tool_use outputs', () => {
+    const outputs: OpenCodeRunOutput[] = [
+      {
+        type: 'text',
+        part: { text: 'Hello, World!' }
+      }
+    ];
+
+    normalizeMockedToolInputs(outputs);
+
+    expect(outputs[0].type).toBe('text');
+    expect(outputs[0].part!.text).toBe('Hello, World!');
+  });
+
+  it('should handle mixed mocked and non-mocked tool calls', () => {
+    const outputs: OpenCodeRunOutput[] = [
+      {
+        type: 'tool_use',
+        part: {
+          tool: 'write',
+          callID: 'call_3',
+          state: {
+            status: 'completed',
+            input: { file_path: '.mock-empty' },
+            output: 'mocked',
+            metadata: {
+              _agentutOriginalInput: { file_path: '/real/hello.txt' }
+            }
+          }
+        }
+      },
+      {
+        type: 'tool_use',
+        part: {
+          tool: 'bash',
+          callID: 'call_4',
+          state: {
+            status: 'completed',
+            input: { command: 'ls -la' },
+            output: 'file1 file2'
+          }
+        }
+      }
+    ];
+
+    normalizeMockedToolInputs(outputs);
+
+    expect(outputs[0].part!.state!.input).toEqual({ file_path: '/real/hello.txt' });
+    expect(outputs[1].part!.state!.input).toEqual({ command: 'ls -la' });
+  });
+
+  it('should restore args correctly for verifyShouldCallTool to match LLM original input', () => {
+    // Simulate: mock neutralized bash command, original was 'rm -rf /tmp/test'
+    const outputs: OpenCodeRunOutput[] = [
+      {
+        type: 'tool_use',
+        part: {
+          tool: 'bash',
+          callID: 'call_5',
+          state: {
+            status: 'completed',
+            input: { command: 'echo mock' },
+            output: 'deleted (mocked)',
+            metadata: {
+              _agentutOriginalInput: { command: 'rm -rf /tmp/test' }
+            }
+          }
+        }
+      }
+    ];
+
+    // Before normalize: assertion on original command should fail
+    const resultBefore = verifyShouldCallTool(outputs, {
+      name: 'bash',
+      input: { command: { contains: 'rm -rf' } }
+    });
+    expect(resultBefore.passed).toBe(false);
+
+    // After normalize: assertion should pass
+    normalizeMockedToolInputs(outputs);
+    const resultAfter = verifyShouldCallTool(outputs, {
+      name: 'bash',
+      input: { command: { contains: 'rm -rf' } }
+    });
+    expect(resultAfter.passed).toBe(true);
+    expect(resultAfter.actual!.input).toEqual({ command: 'rm -rf /tmp/test' });
+  });
+});
+
+describe('verifyMockHits with normalized inputs', () => {
+  it('should match mock rules against original LLM args after normalization', () => {
+    const outputs: OpenCodeRunOutput[] = [
+      {
+        type: 'tool_use',
+        part: {
+          tool: 'write',
+          callID: 'call_mock',
+          state: {
+            status: 'completed',
+            input: { file_path: '.mock-empty' },
+            output: 'mocked output',
+            metadata: {
+              _agentutOriginalInput: { file_path: '/project/config.json' }
+            }
+          }
+        }
+      }
+    ];
+
+    const mockRules: MockRule[] = [
+      { tool: 'write', when: [{ file_path: { contains: 'config.json' } }], output: 'mocked output' }
+    ];
+
+    // Before normalize: verifyMockHits cannot match because input is '.mock-empty'
+    vi.clearAllMocks();
+    verifyMockHits(outputs, mockRules);
+    expect(mockedLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('never matched')
+    );
+
+    // After normalize: verifyMockHits should match against original args
+    normalizeMockedToolInputs(outputs);
+    vi.clearAllMocks();
     verifyMockHits(outputs, mockRules);
     expect(mockedLogger.warn).not.toHaveBeenCalled();
   });
