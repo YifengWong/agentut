@@ -1,6 +1,6 @@
 {
   "name": "agentut",
-  "version": "1.4.6",
+  "version": "1.4.7",
   "description": "Agent UT - Test framework for Agent behaviors",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
