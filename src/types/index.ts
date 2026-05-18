@@ -421,6 +421,7 @@ export interface OpenCodeRunOutput {
       input?: Record<string, unknown>;
       output?: string;
       error?: string;
+      metadata?: Record<string, unknown>;
     };
   };
   // Legacy format support
