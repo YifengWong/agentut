@@ -1,6 +1,6 @@
 // src/runner/opencode.ts
 
-import { execSync, spawn } from 'child_process';
+import { execSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -34,110 +34,96 @@ export class OpenCodeRunner implements AgentRunner {
    * @throws ExecutionError 当命令执行失败时
    * @throws TimeoutError 当命令执行超时时
    */
-  async run(options: RunOptions): Promise<RunResult> {
-    const spawnArgs = ['run'];
+  run(options: RunOptions): RunResult {
+    const args = [`${this.command} run`];
 
+    // Add directory for first step
     if (options.directory) {
-      spawnArgs.push('--dir', options.directory);
-    }
-    if (options.sessionId) {
-      spawnArgs.push('--session', options.sessionId);
-    }
-    if (options.fork) {
-      spawnArgs.push('--fork');
-    }
-    if (options.file) {
-      spawnArgs.push('-f', options.file);
-    }
-    spawnArgs.push('--format', 'json');
-    if (options.model) {
-      spawnArgs.push('--model', options.model);
-    }
-    if (options.agent) {
-      spawnArgs.push('--agent', options.agent);
+      args.push(`--dir "${options.directory}"`);
     }
 
+    // Add session for continuation
+    if (options.sessionId) {
+      args.push(`--session ${options.sessionId}`);
+    }
+
+    // Add fork flag
+    if (options.fork) {
+      args.push('--fork');
+    }
+
+    // Add -f flag for additional file (judge outputs)
+    if (options.file) {
+      args.push(`-f "${options.file}"`);
+    }
+
+    // Always use JSON format
+    args.push('--format json');
+
+    // Add optional model (quoted for special characters like / and .)
+    if (options.model) {
+      args.push(`--model "${options.model}"`);
+    }
+
+    // Add optional agent (quoted for safety)
+    if (options.agent) {
+      args.push(`--agent "${options.agent}"`);
+    }
+
+    const fullCommand = args.join(' ');
     const timeout = options.timeout || 120000;
 
-    return new Promise((resolve, reject) => {
-      const proc = spawn(this.command, spawnArgs, {
-        cwd: options.directory || process.cwd(),
-        stdio: ['pipe', 'pipe', 'pipe']
+    try {
+      const output = execSync(fullCommand, {
+        input: options.input,
+        encoding: 'utf-8',
+        timeout,
+        maxBuffer: 10 * 1024 * 1024, // 10MB
+        cwd: options.directory || process.cwd()
       });
 
-      let stdout = '';
-      let stderr = '';
-      let timedOut = false;
+      // Parse JSON stream output
+      const outputs: OpenCodeRunOutput[] = [];
+      const lines = output.trim().split('\n');
+      let lastSessionId = '';
 
-      proc.stdout?.on('data', (data: Buffer) => {
-        stdout += data.toString();
-      });
-
-      proc.stderr?.on('data', (data: Buffer) => {
-        stderr += data.toString();
-      });
-
-      if (options.input) {
-        proc.stdin?.write(options.input);
-        proc.stdin?.end();
+      for (const line of lines) {
+        if (line.trim()) {
+          try {
+            const parsed = JSON.parse(line) as OpenCodeRunOutput;
+            outputs.push(parsed);
+            // Check both new format (sessionID) and legacy format (session_id)
+            const sessionId = (parsed as { sessionID?: string; session_id?: string }).sessionID ||
+                             (parsed as { session_id?: string }).session_id;
+            if (sessionId) {
+              lastSessionId = sessionId;
+            }
+          } catch {
+            // Skip non-JSON lines
+          }
+        }
       }
 
-      const timer = setTimeout(() => {
-        timedOut = true;
-        proc.kill();
-      }, timeout);
-
-      proc.on('close', (code) => {
-        clearTimeout(timer);
-
-        // Parse collected output
-        const outputs: OpenCodeRunOutput[] = [];
-        const lines = stdout.trim().split('\n');
-        let lastSessionId = '';
-
-        for (const line of lines) {
-          if (line.trim()) {
-            try {
-              const parsed = JSON.parse(line) as OpenCodeRunOutput;
-              outputs.push(parsed);
-              const sessionId = (parsed as { sessionID?: string; session_id?: string }).sessionID ||
-                               (parsed as { session_id?: string }).session_id;
-              if (sessionId) {
-                lastSessionId = sessionId;
-              }
-            } catch {
-              // Skip non-JSON lines
-            }
-          }
+      return {
+        outputs,
+        sessionId: lastSessionId
+      };
+    } catch (error) {
+      if (error instanceof Error) {
+        const nodeError = error as Error & { code?: string };
+        if (nodeError.code === 'ETIMEDOUT') {
+          throw new TimeoutError(
+            `OpenCode execution timed out after ${timeout}ms`,
+            timeout
+          );
         }
-
-        if (timedOut) {
-          if (lastSessionId) {
-            resolve({ outputs, sessionId: lastSessionId });
-          } else {
-            reject(new TimeoutError(
-              `OpenCode execution timed out after ${timeout}ms`,
-              timeout
-            ));
-          }
-        } else if (code === 0) {
-          resolve({ outputs, sessionId: lastSessionId });
-        } else {
-          reject(new ExecutionError(
-            `OpenCode execution failed with code ${code}: ${stderr}`,
-            `${this.command} ${spawnArgs.join(' ')}`
-          ));
-        }
-      });
-
-      proc.on('error', (err) => {
-        clearTimeout(timer);
-        reject(new ExecutionError(
-          `OpenCode execution failed: ${err.message}`,
-          `${this.command} ${spawnArgs.join(' ')}`
-        ));
-      });
-    });
+        throw new ExecutionError(
+          `OpenCode execution failed: ${error.message}`,
+          fullCommand
+        );
+      }
+      throw new ExecutionError('Unknown error during OpenCode execution', fullCommand);
+    }
   }
 
   /**

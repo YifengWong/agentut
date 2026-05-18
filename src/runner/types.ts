@@ -8,7 +8,7 @@ import type { OpenCodeRunOutput, ExportedSession, SessionInfo } from '../types/i
 export interface AgentRunner {
   readonly runnerType: string;
 
-  run(options: RunOptions): Promise<RunResult>;
+  run(options: RunOptions): RunResult;
   exportSession(sessionId: string): Promise<ExportedSession>;
   listSessions(): Promise<SessionInfo[]>;
   importSession(sessionFile: string): Promise<string>;  // 导入 session 文件，返回 session ID
