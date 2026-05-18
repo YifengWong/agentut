@@ -4,7 +4,7 @@ import { parseAndValidateYaml } from '../parser/yaml.js';
 import { createRunner } from '../runner/factory.js';
 import { prepareEnvironment, injectMockPlugin } from '../executor/fixture.js';
 import { cleanTempDirectories } from './clean.js';
-import { verifyAssertions, evaluateScenarioScore, verifyMockHits } from '../executor/verifier.js';
+import { normalizeMockedToolInputs, verifyAssertions, evaluateScenarioScore, verifyMockHits } from '../executor/verifier.js';
 import { generateTestResult } from '../output/json.js';
 import { logger } from '../output/logger.js';
 import {
@@ -292,6 +292,9 @@ async function executeScenario(
           });
 
           sessionId = runResult.sessionId;
+
+          // Normalize mocked tool inputs: restore original LLM args from metadata
+          normalizeMockedToolInputs(runResult.outputs);
 
           // Verify assertions
           const assertionResults = await verifyAssertions(
