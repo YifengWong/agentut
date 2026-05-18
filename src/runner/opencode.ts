@@ -62,7 +62,8 @@ export class OpenCodeRunner implements AgentRunner {
     return new Promise((resolve, reject) => {
       const proc = spawn(this.command, spawnArgs, {
         cwd: options.directory || process.cwd(),
-        stdio: ['pipe', 'pipe', 'pipe']
+        stdio: ['pipe', 'pipe', 'pipe'],
+        shell: true
       });
 
       let stdout = '';
