@@ -700,7 +700,7 @@ export async function verifyJudgedBy(
   const timeout = assertion.timeout || defaultTimeout;
 
   try {
-    const result = runner.run({
+    const result = await runner.run({
       input: combinedPrompt,
       directory: judgeDir,
       timeout,
@@ -795,7 +795,7 @@ export async function evaluateScenarioScore(
 
   try {
     const runner = createRunner(judgeConfig);
-    const result = runner.run({
+    const result = await runner.run({
       input: combinedPrompt,
       directory: workDir,
       timeout,

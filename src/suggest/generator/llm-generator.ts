@@ -36,7 +36,7 @@ export async function generateAssertions(
     runOpts.model = options.model;
   }
 
-  const result = runner.run(runOpts);
+  const result = await runner.run(runOpts);
 
   // Extract text content from runner outputs
   const textOutputs: string[] = [];
