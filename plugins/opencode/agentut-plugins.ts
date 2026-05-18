@@ -151,6 +151,7 @@ export default (async function agentutPlugin(input: PluginInput): Promise<Record
         if (!entry) return;
         hitMap.delete(ctx.callID);
 
+        output.metadata ??= {};
         output.metadata._agentutOriginalInput = entry.originalArgs;
 
         if (entry.rule.output !== undefined) {
