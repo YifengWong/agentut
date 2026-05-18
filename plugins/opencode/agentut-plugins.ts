@@ -56,7 +56,11 @@ const NEUTRALIZERS: Record<string, Neutralizer> = {
   read(args, emptyFile)  { (args as Record<string, unknown>).file_path = emptyFile; },
   write(args, emptyFile) { (args as Record<string, unknown>).file_path = emptyFile; },
   edit(args, emptyFile)  { (args as Record<string, unknown>).file_path = emptyFile; },
-  bash(args, _emptyFile) { (args as Record<string, unknown>).command = "echo mock"; },
+  bash(args, _emptyFile) {
+    const origCmd = String((args as Record<string, unknown>).command ?? '');
+    const escaped = origCmd.replace(/'/g, "'\\''");
+    (args as Record<string, unknown>).command = `echo exec '${escaped}'`;
+  },
   grep(args, _emptyFile) { (args as Record<string, unknown>).path = "."; },
   glob(args, _emptyFile) { (args as Record<string, unknown>).pattern = "__agentut_mock_none__"; },
 };
