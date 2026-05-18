@@ -38,7 +38,10 @@ function sanitizeDirectoryName(name: string): string {
 }
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PLUGIN_SOURCE = path.resolve(__dirname, '../../plugins/opencode/agentut-plugins.ts');
+const PLUGIN_SOURCE_CANDIDATES = [
+  path.resolve(__dirname, '../plugins/opencode/agentut-plugins.ts'),       // dist/plugins/ (production)
+  path.resolve(__dirname, '../../plugins/opencode/agentut-plugins.ts'),    // project-root/plugins/ (dev/test)
+];
 
 export async function createTempDirectory(
   scenarioName: string,
@@ -219,10 +222,13 @@ export async function injectMockPlugin(
   const rulesJson = JSON.stringify({ rules: mockRules }, null, 2);
   await fs.writeFile(path.join(pluginsDir, 'mock-rules.json'), rulesJson);
 
-  // Copy plugin source
+  // Copy plugin source — try candidates (dist-first, then source tree)
   const pluginTarget = path.join(pluginsDir, 'agentut-plugins.ts');
-  if (await fs.pathExists(PLUGIN_SOURCE)) {
-    await fs.copy(PLUGIN_SOURCE, pluginTarget);
+  for (const candidate of PLUGIN_SOURCE_CANDIDATES) {
+    if (await fs.pathExists(candidate)) {
+      await fs.copy(candidate, pluginTarget);
+      break;
+    }
   }
 
   // Create empty file for neutralizing file operations
