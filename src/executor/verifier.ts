@@ -118,6 +118,26 @@ export function getMatcherDescription(matcher: string | Matcher | undefined): st
 }
 
 /**
+ * 归一化 mocked 工具的 input 字段。
+ *
+ * Mock 插件的 tool.execute.before 会中性化工具参数（如 file_path → .mock-empty）
+ * 以防止副作用，但这会污染 OpenCode JSON 输出中的 state.input。
+ * 插件在 metadata._agentutOriginalInput 中保存了原始参数。
+ *
+ * 此函数将 metadata 中的原始参数恢复到 state.input 中，
+ * 使下游断言、蒸馏、评分逻辑无感知。
+ */
+export function normalizeMockedToolInputs(outputs: OpenCodeRunOutput[]): void {
+  for (const o of outputs) {
+    const meta = o.part?.state?.metadata;
+    if (meta?._agentutOriginalInput) {
+      o.part!.state!.input = meta._agentutOriginalInput as Record<string, unknown>;
+      delete meta._agentutOriginalInput;
+    }
+  }
+}
+
+/**
  * Verify that a specific tool was called with optional Matcher support
  */
 export function verifyShouldCallTool(
