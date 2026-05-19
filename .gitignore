@@ -10,3 +10,6 @@ docs/
 .claude/
 .worktrees/
 claude.md
+
+test-temp-verifier/
+test-temp-fixture/
