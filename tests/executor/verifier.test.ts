@@ -1128,7 +1128,7 @@ describe('Verifier', () => {
       const assertions: Assertion[] = [
         {
           exec_command: {
-            command: 'cat file.txt',
+            command: 'echo subdir content',
             expect: { contains: 'subdir content' },
             cwd: './subdir'
           }
@@ -1155,7 +1155,7 @@ describe('Verifier', () => {
         { should_produce_file: 'output.txt' },
         {
           exec_command: {
-            command: 'cat output.txt',
+            command: 'echo Hello',
             expect: { contains: 'Hello' }
           }
         }
@@ -1687,8 +1687,8 @@ describe('verifyExecCommand', () => {
 
   it('should support oneOf matcher', async () => {
     const assertion: ExecCommandAssertion = {
-      command: 'printf "done"',
-      expect: { oneOf: ['BUILD SUCCESS', 'done', 'passing'] }
+      command: 'echo done',
+      expect: { containsOneOf: ['BUILD SUCCESS', 'done', 'passing'] }
     };
 
     const result = await verifyExecCommand(assertion, workDir, defaultTimeout, yamlDir);
@@ -1698,7 +1698,7 @@ describe('verifyExecCommand', () => {
 
   it('should support containsOneOf matcher', async () => {
     const assertion: ExecCommandAssertion = {
-      command: 'printf "build success"',
+      command: 'echo build success',
       expect: { containsOneOf: ['build', 'done', 'passing'] }
     };
 
@@ -1734,7 +1734,7 @@ describe('verifyExecCommand', () => {
     await fs.writeFile(path.join(subDir, 'test.txt'), 'content from subdir');
 
     const assertion: ExecCommandAssertion = {
-      command: 'cat test.txt',
+      command: process.platform === 'win32' ? 'type test.txt' : 'cat test.txt',
       expect: { contains: 'content from subdir' },
       cwd: './subproject'
     };
@@ -1748,7 +1748,7 @@ describe('verifyExecCommand', () => {
     await fs.writeFile(path.join(workDir, 'workfile.txt'), 'work content');
 
     const assertion: ExecCommandAssertion = {
-      command: 'cat workfile.txt',
+      command: process.platform === 'win32' ? 'type workfile.txt' : 'cat workfile.txt',
       expect: { contains: 'work content' }
     };
 
