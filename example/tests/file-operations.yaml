@@ -84,12 +84,12 @@ config:
   agent_cli:
     runner: opencode      # Agent 类型 (opencode, claude, gemini)
     command: opencode       # 实际执行的 CLI 命令名
-    model: opencode/minimax-m2.5-free
+    model: deepseek/deepseek-v4-flash
   judges:
     simple-judge:
       runner: opencode
       command: opencode
-      model: opencode/minimax-m2.5-free
+      model: deepseek/deepseek-v4-flash
       agent: plan
-  default_timeout: 300000
+  default_timeout: 60000
   parallel: false

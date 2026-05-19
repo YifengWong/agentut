@@ -89,12 +89,12 @@ config:
   agent_cli:
     runner: opencode
     command: opencode
-    model: opencode/minimax-m2.5-free
+    model: deepseek/deepseek-v4-flash
   judges:
     simple-judge:
       runner: opencode
       command: opencode
-      model: opencode/minimax-m2.5-free
+      model: deepseek/deepseek-v4-flash
       agent: plan
   default_timeout: 300000
   parallel: false
