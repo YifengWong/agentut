@@ -14,6 +14,7 @@ vi.mock('child_process', () => ({
 vi.mock('fs', () => ({
   default: {
     readFileSync: vi.fn(),
+    writeFileSync: vi.fn(),
     unlinkSync: vi.fn()
   }
 }));
@@ -232,20 +233,26 @@ describe('OpenCodeRunner', () => {
       expect(result.sessionId).toBe('ses_new_format');
     });
 
-    it('should pass input via stdin (input option)', () => {
+    it('should pass input via temp file redirection', () => {
       vi.mocked(execSync).mockReturnValue('{}');
 
       runner.run({
         input: 'Say "hello" to the user'
       });
 
-      // prompt no longer appears in command string — goes through stdin
-      expect(execSync).toHaveBeenCalledWith(
-        expect.not.stringContaining('Say'),
-        expect.objectContaining({
-          input: 'Say "hello" to the user'
-        })
+      // input is written to temp file and passed via < redirection
+      expect(fs.writeFileSync).toHaveBeenCalledWith(
+        expect.stringContaining('agentut-input-'),
+        'Say "hello" to the user',
+        'utf-8'
       );
+      // command should include < redirection, not the input text itself
+      expect(execSync).toHaveBeenCalledWith(
+        expect.stringContaining('< "'),
+        expect.not.objectContaining({ input: expect.anything() })
+      );
+      // temp file should be cleaned up
+      expect(fs.unlinkSync).toHaveBeenCalled();
     });
 
     it('should use -f flag when file option is specified', () => {

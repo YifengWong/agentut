@@ -101,9 +101,15 @@ export class OpenCodeRunner implements AgentRunner {
     const fullCommand = args.join(' ');
     const timeout = options.timeout || 120000;
 
+    // 将 input 写入临时文件，通过 < 重定向传入，避免部分 opencode 发行版无法接受 stdin input
+    const tmpFile = path.join(os.tmpdir(), `agentut-input-${Date.now()}-${Math.random().toString(36).slice(2)}.md`);
+
     try {
-      const output = execSync(fullCommand, {
-        input: options.input,
+      fs.writeFileSync(tmpFile, options.input, 'utf-8');
+
+      const commandWithInput = `${fullCommand} < "${tmpFile}"`;
+
+      const output = execSync(commandWithInput, {
         encoding: 'utf-8',
         timeout,
         maxBuffer: 10 * 1024 * 1024, // 10MB
@@ -132,6 +138,13 @@ export class OpenCodeRunner implements AgentRunner {
         );
       }
       throw new ExecutionError('Unknown error during OpenCode execution', fullCommand);
+    } finally {
+      // 清理临时文件
+      try {
+        fs.unlinkSync(tmpFile);
+      } catch {
+        // Ignore cleanup errors
+      }
     }
   }
 
