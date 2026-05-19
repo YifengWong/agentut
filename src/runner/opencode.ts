@@ -14,6 +14,34 @@ import {
 import type { AgentRunner, RunOptions, RunResult } from './types.js';
 
 /**
+ * 解析 OpenCode JSON 流输出（每行一个 JSON 对象）
+ */
+function parseJsonStream(stdout: string): { outputs: OpenCodeRunOutput[]; sessionId: string } {
+  const outputs: OpenCodeRunOutput[] = [];
+  const lines = stdout.trim().split('\n');
+  let lastSessionId = '';
+
+  for (const line of lines) {
+    if (line.trim()) {
+      try {
+        const parsed = JSON.parse(line) as OpenCodeRunOutput;
+        outputs.push(parsed);
+        // Check both new format (sessionID) and legacy format (session_id)
+        const sessionId = (parsed as { sessionID?: string; session_id?: string }).sessionID ||
+                         (parsed as { session_id?: string }).session_id;
+        if (sessionId) {
+          lastSessionId = sessionId;
+        }
+      } catch {
+        // Skip non-JSON lines
+      }
+    }
+  }
+
+  return { outputs, sessionId: lastSessionId };
+}
+
+/**
  * OpenCodeRunner - 实现 AgentRunner 接口，用于与 OpenCode CLI 交互
  *
  * 该类封装了与 OpenCode CLI 的所有交互逻辑，支持自定义命令名。
@@ -32,7 +60,7 @@ export class OpenCodeRunner implements AgentRunner {
    * @param options - 运行选项
    * @returns 运行结果，包含输出和会话 ID
    * @throws ExecutionError 当命令执行失败时
-   * @throws TimeoutError 当命令执行超时时
+   * @throws TimeoutError 当命令执行超时且无会话信息时
    */
   run(options: RunOptions): RunResult {
     const args = [`${this.command} run`];
@@ -82,36 +110,17 @@ export class OpenCodeRunner implements AgentRunner {
         cwd: options.directory || process.cwd()
       });
 
-      // Parse JSON stream output
-      const outputs: OpenCodeRunOutput[] = [];
-      const lines = output.trim().split('\n');
-      let lastSessionId = '';
-
-      for (const line of lines) {
-        if (line.trim()) {
-          try {
-            const parsed = JSON.parse(line) as OpenCodeRunOutput;
-            outputs.push(parsed);
-            // Check both new format (sessionID) and legacy format (session_id)
-            const sessionId = (parsed as { sessionID?: string; session_id?: string }).sessionID ||
-                             (parsed as { session_id?: string }).session_id;
-            if (sessionId) {
-              lastSessionId = sessionId;
-            }
-          } catch {
-            // Skip non-JSON lines
-          }
-        }
-      }
-
-      return {
-        outputs,
-        sessionId: lastSessionId
-      };
+      return parseJsonStream(output);
     } catch (error) {
       if (error instanceof Error) {
-        const nodeError = error as Error & { code?: string };
+        const nodeError = error as Error & { code?: string; stdout?: string };
         if (nodeError.code === 'ETIMEDOUT') {
+          // 尝试从部分输出中恢复：如果已有 session 信息，说明工具实际已执行，
+          // 只是卡在交互步骤，该次运行仍视为有效，继续后续测试动作
+          const partial = parseJsonStream(nodeError.stdout || '');
+          if (partial.sessionId) {
+            return partial;
+          }
           throw new TimeoutError(
             `OpenCode execution timed out after ${timeout}ms`,
             timeout
