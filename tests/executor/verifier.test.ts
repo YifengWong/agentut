@@ -1634,9 +1634,18 @@ describe('verifyJudgedBy', () => {
 });
 
 describe('verifyExecCommand', () => {
-  const workDir = TEST_TEMP_DIR;
+  const TEST_EXEC_DIR = './test-temp-exec';
+  const workDir = path.resolve(TEST_EXEC_DIR);
   const defaultTimeout = 30000;
-  const yamlDir = TEST_TEMP_DIR;
+  const yamlDir = path.resolve(TEST_TEMP_DIR);
+
+  beforeEach(async () => {
+    await fs.ensureDir(TEST_EXEC_DIR);
+  });
+
+  afterEach(async () => {
+    await fs.remove(TEST_EXEC_DIR);
+  });
 
   it('should return true when output matches contains matcher', async () => {
     const assertion: ExecCommandAssertion = {
@@ -1720,7 +1729,7 @@ describe('verifyExecCommand', () => {
   });
 
   it('should use cwd parameter for execution directory', async () => {
-    const subDir = path.join(TEST_TEMP_DIR, 'subproject');
+    const subDir = path.join(workDir, 'subproject');
     await fs.ensureDir(subDir);
     await fs.writeFile(path.join(subDir, 'test.txt'), 'content from subdir');
 
@@ -1730,20 +1739,20 @@ describe('verifyExecCommand', () => {
       cwd: './subproject'
     };
 
-    const result = await verifyExecCommand(assertion, workDir, defaultTimeout, yamlDir);
+    const result = await verifyExecCommand(assertion, workDir, defaultTimeout, workDir);
 
     expect(result.passed).toBe(true);
   });
 
   it('should use default workDir when cwd not specified', async () => {
-    await fs.writeFile(path.join(TEST_TEMP_DIR, 'workfile.txt'), 'work content');
+    await fs.writeFile(path.join(workDir, 'workfile.txt'), 'work content');
 
     const assertion: ExecCommandAssertion = {
       command: 'cat workfile.txt',
       expect: { contains: 'work content' }
     };
 
-    const result = await verifyExecCommand(assertion, workDir, defaultTimeout, yamlDir);
+    const result = await verifyExecCommand(assertion, workDir, defaultTimeout, workDir);
 
     expect(result.passed).toBe(true);
   });

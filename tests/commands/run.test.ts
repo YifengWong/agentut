@@ -20,7 +20,10 @@ vi.mock('../../src/executor/fixture.js', () => ({
 }));
 
 vi.mock('../../src/executor/verifier.js', () => ({
-  verifyAssertions: vi.fn()
+  verifyAssertions: vi.fn(),
+  normalizeMockedToolInputs: vi.fn(),
+  evaluateScenarioScore: vi.fn(),
+  verifyMockHits: vi.fn()
 }));
 
 vi.mock('../../src/output/logger.js', () => ({
