@@ -30,23 +30,6 @@ function collectOutput(proc: ChildProcess): Promise<string> {
   });
 }
 
-/**
- * 创建超时 Promise，到期时 treeKill 进程并抛出 TimeoutError。
- * 返回 Promise 和 timeoutId，调用方负责在进程正常结束时 clearTimeout。
- */
-function createTimeout(ms: number, pid: number): { promise: Promise<never>; id: ReturnType<typeof setTimeout> } {
-  let timeoutId: ReturnType<typeof setTimeout>;
-  const promise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => {
-      treeKill(pid);
-      reject(new TimeoutError(
-        `OpenCode execution timed out after ${ms}ms`,
-        ms
-      ));
-    }, ms);
-  });
-  return { promise, id: timeoutId! };
-}
 
 /**
  * 解析 OpenCode JSON 流输出（每行一个 JSON 对象）
@@ -141,6 +124,7 @@ export class OpenCodeRunner implements AgentRunner {
     let exitCode: number | null = null;
     let proc: ChildProcess | undefined;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
 
     try {
       fs.writeFileSync(tmpFile, options.input, 'utf-8');
@@ -164,18 +148,31 @@ export class OpenCodeRunner implements AgentRunner {
         exitCode = code;
       });
 
-      const { promise: timeoutPromise, id } = createTimeout(timeout, proc.pid!);
-      timeoutId = id;
+      // 超时定时器：到期时杀进程树，但不中断收集输出
+      timeoutId = setTimeout(() => {
+        timedOut = true;
+        if (proc?.pid != null) treeKill(proc.pid!);
+      }, timeout);
 
-      const output = await Promise.race([
-        collectOutput(proc),
-        timeoutPromise
-      ]);
+      // 始终等待进程关闭（正常退出或被 treeKill 杀死）
+      const stdout = await collectOutput(proc);
 
-      return parseJsonStream(output);
+      if (timedOut) {
+        // 超时退出：尝试从已收集的输出中恢复会话信息
+        // 实际已有对话和行为发生，应尽可能保留以供后续断言
+        const partial = parseJsonStream(stdout);
+        if (partial.sessionId) {
+          return partial;
+        }
+        throw new TimeoutError(
+          `OpenCode execution timed out after ${timeout}ms (no session info recovered)`,
+          timeout
+        );
+      }
+
+      return parseJsonStream(stdout);
     } catch (error) {
       if (error instanceof TimeoutError) {
-        // 超时场景：treeKill 已在 createTimeout 中调用
         throw error;
       }
       if (error instanceof Error) {

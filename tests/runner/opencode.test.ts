@@ -132,18 +132,49 @@ describe('OpenCodeRunner', () => {
       expect(processManager.unregister).toHaveBeenCalledWith(12345);
     });
 
-    it('should throw TimeoutError on timeout', async () => {
+    it('should throw TimeoutError on timeout with no session info recovered', async () => {
       const mockProc = new EventEmitter() as any;
       mockProc.stdout = new EventEmitter();
       mockProc.stderr = new EventEmitter();
       mockProc.pid = 12345;
 
       vi.mocked(spawn).mockReturnValue(mockProc);
-      // Don't emit 'close' — timeout fires first
+
+      // treeKill kills the process → close fires without valid output
+      vi.mocked(treeKill).mockImplementation(() => {
+        setImmediate(() => mockProc.emit('close', null));
+      });
 
       await expect(
         runner.run({ input: 'Test', timeout: 100 })
       ).rejects.toThrow(TimeoutError);
+    });
+
+    it('should return partial result on timeout if session info recovered', async () => {
+      const mockProc = new EventEmitter() as any;
+      mockProc.stdout = new EventEmitter();
+      mockProc.stderr = new EventEmitter();
+      mockProc.pid = 12345;
+
+      vi.mocked(spawn).mockReturnValue(mockProc);
+
+      const partialOutput = JSON.stringify({
+        type: 'text',
+        data: { content: 'partial response' },
+        session_id: 'ses_partial',
+        timestamp: 1
+      });
+
+      // treeKill kills the process → emit partial output before close
+      vi.mocked(treeKill).mockImplementation(() => {
+        mockProc.stdout.emit('data', Buffer.from(partialOutput));
+        setImmediate(() => mockProc.emit('close', null));
+      });
+
+      const result = await runner.run({ input: 'Test', timeout: 100 });
+
+      expect(result.sessionId).toBe('ses_partial');
+      expect(result.outputs).toHaveLength(1);
     });
 
     it('should use --session flag for continuation', async () => {
