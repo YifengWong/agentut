@@ -142,8 +142,10 @@ export async function executeSetup(
           });
 
           const timeoutId = setTimeout(() => {
-            treeKill(proc.pid!);
-            processManager.unregister(proc.pid!);
+            if (proc.pid != null) {
+              treeKill(proc.pid);
+              processManager.unregister(proc.pid);
+            }
             reject(new SetupError(
               `Setup command timed out after 60s: ${action.run}`,
               action
@@ -152,7 +154,12 @@ export async function executeSetup(
 
           proc.on('close', (code) => {
             clearTimeout(timeoutId);
-            processManager.unregister(proc.pid!);
+            if (code !== 0 && proc.pid != null) {
+              treeKill(proc.pid);
+            }
+            if (proc.pid != null) {
+              processManager.unregister(proc.pid);
+            }
             if (code === 0) {
               resolve();
             } else {
@@ -165,8 +172,10 @@ export async function executeSetup(
 
           proc.on('error', (err) => {
             clearTimeout(timeoutId);
-            treeKill(proc.pid!);
-            processManager.unregister(proc.pid!);
+            if (proc.pid != null) {
+              treeKill(proc.pid);
+              processManager.unregister(proc.pid);
+            }
             reject(new SetupError(
               `Setup command failed: ${err.message}`,
               action

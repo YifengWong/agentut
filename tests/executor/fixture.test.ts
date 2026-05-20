@@ -20,7 +20,8 @@ vi.mock('../../src/output/logger.js', () => ({
     setupCopy: vi.fn(),
     setupRun: vi.fn(),
     endEnvironmentPrep: vi.fn(),
-    cleanup: vi.fn()
+    cleanup: vi.fn(),
+    warn: vi.fn()
   }
 }));
 

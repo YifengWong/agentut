@@ -177,11 +177,11 @@ export class OpenCodeRunner implements AgentRunner {
       throw new ExecutionError('Unknown error during OpenCode execution', fullCommand);
     } finally {
       // 仅在异常退出时 treeKill（非零 exitCode），避免误杀被 OS 复用的 PID
-      if (proc && exitCode !== 0 && exitCode !== null) {
-        treeKill(proc.pid!);
+      if (proc?.pid != null && exitCode !== 0 && exitCode !== null) {
+        treeKill(proc.pid);
       }
-      if (proc) {
-        processManager.unregister(proc.pid!);
+      if (proc?.pid != null) {
+        processManager.unregister(proc.pid);
       }
 
       // 清理临时文件

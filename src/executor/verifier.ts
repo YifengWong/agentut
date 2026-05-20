@@ -502,7 +502,9 @@ async function executeCommand(
       timeout
     });
 
-    processManager.register(proc.pid!);
+    if (proc.pid != null) {
+      processManager.register(proc.pid);
+    }
 
     let stdout = '';
     let stderr = '';
@@ -517,10 +519,12 @@ async function executeCommand(
 
     proc.on('close', (code, signal) => {
       // If killed by signal (timeout), treeKill to ensure no orphans
-      if (signal) {
-        treeKill(proc.pid!);
+      if (signal && proc.pid != null) {
+        treeKill(proc.pid);
       }
-      processManager.unregister(proc.pid!);
+      if (proc.pid != null) {
+        processManager.unregister(proc.pid);
+      }
       resolve({
         stdout,
         stderr,
@@ -529,8 +533,10 @@ async function executeCommand(
     });
 
     proc.on('error', (err) => {
-      treeKill(proc.pid!);
-      processManager.unregister(proc.pid!);
+      if (proc.pid != null) {
+        treeKill(proc.pid);
+        processManager.unregister(proc.pid);
+      }
       reject(err);
     });
   });
