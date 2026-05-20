@@ -1,6 +1,6 @@
 // src/runner/opencode.ts
 
-import { execSync } from 'child_process';
+import { spawn, execSync, type ChildProcess } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -12,6 +12,38 @@ import {
   type SessionInfo
 } from '../types/index.js';
 import type { AgentRunner, RunOptions, RunResult } from './types.js';
+import { processManager, treeKill } from '../process/index.js';
+
+/**
+ * 收集 spawn 进程的 stdout 输出直到进程关闭
+ */
+function collectOutput(proc: ChildProcess): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let stdout = '';
+    proc.stdout?.on('data', (data: Buffer | string) => {
+      stdout += data.toString();
+    });
+    proc.on('close', () => {
+      resolve(stdout);
+    });
+    proc.on('error', reject);
+  });
+}
+
+/**
+ * 创建超时 Promise，到期时 treeKill 进程并抛出 TimeoutError
+ */
+function createTimeout(ms: number, pid: number): Promise<never> {
+  return new Promise((_, reject) => {
+    setTimeout(() => {
+      treeKill(pid);
+      reject(new TimeoutError(
+        `OpenCode execution timed out after ${ms}ms`,
+        ms
+      ));
+    }, ms);
+  });
+}
 
 /**
  * 解析 OpenCode JSON 流输出（每行一个 JSON 对象）
@@ -62,7 +94,7 @@ export class OpenCodeRunner implements AgentRunner {
    * @throws ExecutionError 当命令执行失败时
    * @throws TimeoutError 当命令执行超时且无会话信息时
    */
-  run(options: RunOptions): RunResult {
+  async run(options: RunOptions): Promise<RunResult> {
     const args = [`${this.command} run`];
 
     // Add directory for first step
@@ -103,35 +135,40 @@ export class OpenCodeRunner implements AgentRunner {
 
     // 将 input 写入临时文件，通过 < 重定向传入，避免部分 opencode 发行版无法接受 stdin input
     const tmpFile = path.join(os.tmpdir(), `agentut-input-${Date.now()}-${Math.random().toString(36).slice(2)}.md`);
+    let exitCode: number | null = null;
+    let proc: ChildProcess | undefined;
 
     try {
       fs.writeFileSync(tmpFile, options.input, 'utf-8');
 
       const commandWithInput = `${fullCommand} < "${tmpFile}"`;
 
-      const output = execSync(commandWithInput, {
-        encoding: 'utf-8',
-        timeout,
-        maxBuffer: 10 * 1024 * 1024, // 10MB
-        cwd: options.directory || process.cwd()
+      proc = spawn(commandWithInput, [], {
+        shell: true,
+        detached: true,
+        cwd: options.directory || process.cwd(),
+        stdio: ['pipe', 'pipe', 'pipe']
       });
+
+      processManager.register(proc.pid!);
+
+      proc.on('close', (code) => {
+        exitCode = code;
+      });
+
+      const output = await Promise.race([
+        collectOutput(proc),
+        createTimeout(timeout, proc.pid!)
+      ]);
 
       return parseJsonStream(output);
     } catch (error) {
+      if (error instanceof TimeoutError) {
+        // 超时场景：尝试从已收集的 stdout 恢复部分输出
+        // （如果是超时路径，treeKill 已在 createTimeout 中调用）
+        throw error;
+      }
       if (error instanceof Error) {
-        const nodeError = error as Error & { code?: string; stdout?: string };
-        if (nodeError.code === 'ETIMEDOUT') {
-          // 尝试从部分输出中恢复：如果已有 session 信息，说明工具实际已执行，
-          // 只是卡在交互步骤，该次运行仍视为有效，继续后续测试动作
-          const partial = parseJsonStream(nodeError.stdout || '');
-          if (partial.sessionId) {
-            return partial;
-          }
-          throw new TimeoutError(
-            `OpenCode execution timed out after ${timeout}ms`,
-            timeout
-          );
-        }
         throw new ExecutionError(
           `OpenCode execution failed: ${error.message}`,
           fullCommand
@@ -139,6 +176,14 @@ export class OpenCodeRunner implements AgentRunner {
       }
       throw new ExecutionError('Unknown error during OpenCode execution', fullCommand);
     } finally {
+      // 仅在异常退出时 treeKill（非零 exitCode），避免误杀被 OS 复用的 PID
+      if (proc && exitCode !== 0 && exitCode !== null) {
+        treeKill(proc.pid!);
+      }
+      if (proc) {
+        processManager.unregister(proc.pid!);
+      }
+
       // 清理临时文件
       try {
         fs.unlinkSync(tmpFile);

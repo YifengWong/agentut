@@ -1,13 +1,39 @@
 // tests/runner/opencode.test.ts
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { EventEmitter } from 'events';
 import { OpenCodeRunner } from '../../src/runner/opencode.js';
 import { ExecutionError, TimeoutError } from '../../src/types/index.js';
-import type { RunOptions } from '../../src/runner/types.js';
 
-// Mock child_process
+function createMockProcess(stdoutData: string, exitCode = 0) {
+  const mockProc = new EventEmitter() as any;
+  mockProc.stdout = new EventEmitter();
+  mockProc.stderr = new EventEmitter();
+  mockProc.pid = 12345;
+
+  setImmediate(() => {
+    if (stdoutData) {
+      mockProc.stdout.emit('data', Buffer.from(stdoutData));
+    }
+    mockProc.emit('close', exitCode);
+  });
+
+  return mockProc;
+}
+
+// Mock child_process — provide both spawn and execSync
 vi.mock('child_process', () => ({
+  spawn: vi.fn(),
   execSync: vi.fn()
+}));
+
+// Mock process module
+vi.mock('../../src/process/index.js', () => ({
+  processManager: {
+    register: vi.fn(),
+    unregister: vi.fn()
+  },
+  treeKill: vi.fn()
 }));
 
 // Mock fs
@@ -27,9 +53,10 @@ vi.mock('os', () => ({
 }));
 
 import path from 'path';
-import { execSync } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
+import { processManager, treeKill } from '../../src/process/index.js';
 
 describe('OpenCodeRunner', () => {
   let runner: OpenCodeRunner;
@@ -55,161 +82,182 @@ describe('OpenCodeRunner', () => {
   });
 
   describe('run', () => {
-    it('should call CLI with correct arguments for first step', () => {
+    it('should call CLI with correct arguments for first step', async () => {
       const mockOutput = JSON.stringify({
         type: 'text',
         data: { content: 'Hello' },
         session_id: 'ses_123',
         timestamp: 1234567890
       });
-      vi.mocked(execSync).mockReturnValue(mockOutput);
+      vi.mocked(spawn).mockReturnValue(createMockProcess(mockOutput));
 
-      const result = runner.run({ input: 'Hello', directory: '/test/project' });
+      const result = await runner.run({ input: 'Hello', directory: '/test/project' });
 
-      expect(execSync).toHaveBeenCalledWith(
+      expect(spawn).toHaveBeenCalledWith(
         expect.stringContaining('opencode run'),
-        expect.any(Object)
+        expect.any(Array),
+        expect.objectContaining({ shell: true, detached: true })
       );
       expect(result.sessionId).toBe('ses_123');
+      expect(processManager.register).toHaveBeenCalledWith(12345);
+      expect(processManager.unregister).toHaveBeenCalledWith(12345);
     });
 
-    it('should use custom command name when configured', () => {
+    it('should use custom command name when configured', async () => {
       const customRunner = new OpenCodeRunner('mycode');
-      vi.mocked(execSync).mockReturnValue('{}');
+      vi.mocked(spawn).mockReturnValue(createMockProcess('{}'));
 
-      customRunner.run({ input: 'Test', directory: '/test' });
+      await customRunner.run({ input: 'Test', directory: '/test' });
 
-      expect(execSync).toHaveBeenCalledWith(
+      expect(spawn).toHaveBeenCalledWith(
         expect.stringContaining('mycode run'),
+        expect.any(Array),
         expect.any(Object)
       );
     });
 
-    it('should throw ExecutionError on failure', () => {
-      vi.mocked(execSync).mockImplementation(() => {
-        throw new Error('Command failed');
+    it('should throw ExecutionError on failure', async () => {
+      const mockProc = new EventEmitter() as any;
+      mockProc.stdout = new EventEmitter();
+      mockProc.stderr = new EventEmitter();
+      mockProc.pid = 12345;
+
+      vi.mocked(spawn).mockReturnValue(mockProc);
+
+      setImmediate(() => {
+        mockProc.emit('error', new Error('Command failed'));
       });
 
-      expect(() => runner.run({ input: 'Test' })).toThrow(ExecutionError);
+      await expect(runner.run({ input: 'Test' })).rejects.toThrow(ExecutionError);
+      expect(processManager.unregister).toHaveBeenCalledWith(12345);
     });
 
-    it('should throw TimeoutError when ETIMEDOUT', () => {
-      vi.mocked(execSync).mockImplementation(() => {
-        const error = new Error('Timeout') as Error & { code?: string };
-        error.code = 'ETIMEDOUT';
-        throw error;
-      });
+    it('should throw TimeoutError on timeout', async () => {
+      const mockProc = new EventEmitter() as any;
+      mockProc.stdout = new EventEmitter();
+      mockProc.stderr = new EventEmitter();
+      mockProc.pid = 12345;
 
-      expect(() => runner.run({ input: 'Test', timeout: 5000 })).toThrow(TimeoutError);
+      vi.mocked(spawn).mockReturnValue(mockProc);
+      // Don't emit 'close' — timeout fires first
+
+      await expect(
+        runner.run({ input: 'Test', timeout: 100 })
+      ).rejects.toThrow(TimeoutError);
     });
 
-    it('should use --session flag for continuation', () => {
+    it('should use --session flag for continuation', async () => {
       const mockOutput = JSON.stringify({
         type: 'text',
         data: { content: 'Response' },
         session_id: 'ses_456',
         timestamp: 1234567890
       });
-      vi.mocked(execSync).mockReturnValue(mockOutput);
+      vi.mocked(spawn).mockReturnValue(createMockProcess(mockOutput));
 
-      runner.run({
+      await runner.run({
         input: 'Continue',
         sessionId: 'ses_123'
       });
 
-      expect(execSync).toHaveBeenCalledWith(
+      expect(spawn).toHaveBeenCalledWith(
         expect.stringContaining('--session ses_123'),
+        expect.any(Array),
         expect.any(Object)
       );
     });
 
-    it('should use --fork flag when specified', () => {
+    it('should use --fork flag when specified', async () => {
       const mockOutput = JSON.stringify({
         type: 'text',
         data: { content: 'Response' },
         session_id: 'ses_789',
         timestamp: 1234567890
       });
-      vi.mocked(execSync).mockReturnValue(mockOutput);
+      vi.mocked(spawn).mockReturnValue(createMockProcess(mockOutput));
 
-      runner.run({
+      await runner.run({
         input: 'Test',
         sessionId: 'ses_123',
         fork: true
       });
 
-      expect(execSync).toHaveBeenCalledWith(
+      expect(spawn).toHaveBeenCalledWith(
         expect.stringContaining('--fork'),
+        expect.any(Array),
         expect.any(Object)
       );
     });
 
-    it('should use --format json flag', () => {
-      vi.mocked(execSync).mockReturnValue('{}');
+    it('should use --format json flag', async () => {
+      vi.mocked(spawn).mockReturnValue(createMockProcess('{}'));
 
-      runner.run({
+      await runner.run({
         input: 'Test',
         directory: '/test'
       });
 
-      expect(execSync).toHaveBeenCalledWith(
+      expect(spawn).toHaveBeenCalledWith(
         expect.stringContaining('--format json'),
+        expect.any(Array),
         expect.any(Object)
       );
     });
 
-    it('should use --model flag when specified', () => {
-      vi.mocked(execSync).mockReturnValue('{}');
+    it('should use --model flag when specified', async () => {
+      vi.mocked(spawn).mockReturnValue(createMockProcess('{}'));
 
-      runner.run({
+      await runner.run({
         input: 'Test',
         model: 'claude-sonnet'
       });
 
-      expect(execSync).toHaveBeenCalledWith(
+      expect(spawn).toHaveBeenCalledWith(
         expect.stringContaining('--model "claude-sonnet"'),
+        expect.any(Array),
         expect.any(Object)
       );
     });
 
-    it('should use --agent flag when specified', () => {
-      vi.mocked(execSync).mockReturnValue('{}');
+    it('should use --agent flag when specified', async () => {
+      vi.mocked(spawn).mockReturnValue(createMockProcess('{}'));
 
-      runner.run({
+      await runner.run({
         input: 'Test',
         agent: 'my-skill'
       });
 
-      expect(execSync).toHaveBeenCalledWith(
+      expect(spawn).toHaveBeenCalledWith(
         expect.stringContaining('--agent "my-skill"'),
+        expect.any(Array),
         expect.any(Object)
       );
     });
 
-    it('should quote model value with special characters', () => {
-      vi.mocked(execSync).mockReturnValue('{}');
+    it('should quote model value with special characters', async () => {
+      vi.mocked(spawn).mockReturnValue(createMockProcess('{}'));
 
-      runner.run({
+      await runner.run({
         input: 'Test',
         model: 'anthropic/claude-3.5-sonnet'
       });
 
-      expect(execSync).toHaveBeenCalledWith(
+      expect(spawn).toHaveBeenCalledWith(
         expect.stringContaining('--model "anthropic/claude-3.5-sonnet"'),
+        expect.any(Array),
         expect.any(Object)
       );
     });
 
-    it('should parse JSON stream output', () => {
+    it('should parse JSON stream output', async () => {
       const mockOutput = [
         JSON.stringify({ type: 'message', data: { role: 'user' }, session_id: 'ses_1', timestamp: 1 }),
         JSON.stringify({ type: 'tool_call', data: { tool_name: 'Write' }, session_id: 'ses_1', timestamp: 2 }),
         JSON.stringify({ type: 'text', data: { content: 'Done' }, session_id: 'ses_1', timestamp: 3 })
       ].join('\n');
+      vi.mocked(spawn).mockReturnValue(createMockProcess(mockOutput));
 
-      vi.mocked(execSync).mockReturnValue(mockOutput);
-
-      const result = runner.run({
+      const result = await runner.run({
         input: 'Create file',
         directory: '/test'
       });
@@ -220,53 +268,71 @@ describe('OpenCodeRunner', () => {
       expect(result.sessionId).toBe('ses_1');
     });
 
-    it('should parse sessionID in new format', () => {
+    it('should parse sessionID in new format', async () => {
       const mockOutput = JSON.stringify({
         type: 'text',
         sessionID: 'ses_new_format',
         timestamp: 1234567890
       });
-      vi.mocked(execSync).mockReturnValue(mockOutput);
+      vi.mocked(spawn).mockReturnValue(createMockProcess(mockOutput));
 
-      const result = runner.run({ input: 'Test' });
+      const result = await runner.run({ input: 'Test' });
 
       expect(result.sessionId).toBe('ses_new_format');
     });
 
-    it('should pass input via temp file redirection', () => {
-      vi.mocked(execSync).mockReturnValue('{}');
+    it('should pass input via temp file redirection', async () => {
+      vi.mocked(spawn).mockReturnValue(createMockProcess('{}'));
 
-      runner.run({
+      await runner.run({
         input: 'Say "hello" to the user'
       });
 
-      // input is written to temp file and passed via < redirection
       expect(fs.writeFileSync).toHaveBeenCalledWith(
         expect.stringContaining('agentut-input-'),
         'Say "hello" to the user',
         'utf-8'
       );
-      // command should include < redirection, not the input text itself
-      expect(execSync).toHaveBeenCalledWith(
+      expect(spawn).toHaveBeenCalledWith(
         expect.stringContaining('< "'),
-        expect.not.objectContaining({ input: expect.anything() })
+        expect.any(Array),
+        expect.any(Object)
       );
-      // temp file should be cleaned up
       expect(fs.unlinkSync).toHaveBeenCalled();
     });
 
-    it('should use -f flag when file option is specified', () => {
-      vi.mocked(execSync).mockReturnValue('{}');
+    it('should use -f flag when file option is specified', async () => {
+      vi.mocked(spawn).mockReturnValue(createMockProcess('{}'));
 
-      runner.run({
+      await runner.run({
         input: 'Test',
         file: '/path/to/outputs.json'
       });
 
-      expect(execSync).toHaveBeenCalledWith(
+      expect(spawn).toHaveBeenCalledWith(
         expect.stringContaining('-f "/path/to/outputs.json"'),
+        expect.any(Array),
         expect.any(Object)
       );
+    });
+
+    it('should treeKill and unregister on non-zero exitCode', async () => {
+      vi.mocked(spawn).mockReturnValue(createMockProcess('partial output', 1));
+
+      const result = await runner.run({ input: 'Test' });
+
+      expect(result.outputs).toHaveLength(0); // partial output — no valid JSON
+      expect(treeKill).toHaveBeenCalledWith(12345);
+      expect(processManager.unregister).toHaveBeenCalledWith(12345);
+    });
+
+    it('should NOT treeKill on normal exit (exitCode 0)', async () => {
+      vi.mocked(spawn).mockReturnValue(createMockProcess('{}', 0));
+
+      await runner.run({ input: 'Test' });
+
+      expect(treeKill).not.toHaveBeenCalled();
+      expect(processManager.unregister).toHaveBeenCalledWith(12345);
     });
   });
 
