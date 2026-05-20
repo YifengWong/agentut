@@ -31,11 +31,13 @@ function collectOutput(proc: ChildProcess): Promise<string> {
 }
 
 /**
- * 创建超时 Promise，到期时 treeKill 进程并抛出 TimeoutError
+ * 创建超时 Promise，到期时 treeKill 进程并抛出 TimeoutError。
+ * 返回 Promise 和 timeoutId，调用方负责在进程正常结束时 clearTimeout。
  */
-function createTimeout(ms: number, pid: number): Promise<never> {
-  return new Promise((_, reject) => {
-    setTimeout(() => {
+function createTimeout(ms: number, pid: number): { promise: Promise<never>; id: ReturnType<typeof setTimeout> } {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  const promise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
       treeKill(pid);
       reject(new TimeoutError(
         `OpenCode execution timed out after ${ms}ms`,
@@ -43,6 +45,7 @@ function createTimeout(ms: number, pid: number): Promise<never> {
       ));
     }, ms);
   });
+  return { promise, id: timeoutId! };
 }
 
 /**
@@ -137,15 +140,20 @@ export class OpenCodeRunner implements AgentRunner {
     const tmpFile = path.join(os.tmpdir(), `agentut-input-${Date.now()}-${Math.random().toString(36).slice(2)}.md`);
     let exitCode: number | null = null;
     let proc: ChildProcess | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
     try {
       fs.writeFileSync(tmpFile, options.input, 'utf-8');
 
       const commandWithInput = `${fullCommand} < "${tmpFile}"`;
 
+      // Windows 上不使用 detached，taskkill /T 已能杀进程树
+      // Unix 上需要 detached 以支持 process.kill(-pid) 杀进程组
+      const isWindows = process.platform === 'win32';
+
       proc = spawn(commandWithInput, [], {
         shell: true,
-        detached: true,
+        detached: !isWindows,
         cwd: options.directory || process.cwd(),
         stdio: ['pipe', 'pipe', 'pipe']
       });
@@ -156,16 +164,18 @@ export class OpenCodeRunner implements AgentRunner {
         exitCode = code;
       });
 
+      const { promise: timeoutPromise, id } = createTimeout(timeout, proc.pid!);
+      timeoutId = id;
+
       const output = await Promise.race([
         collectOutput(proc),
-        createTimeout(timeout, proc.pid!)
+        timeoutPromise
       ]);
 
       return parseJsonStream(output);
     } catch (error) {
       if (error instanceof TimeoutError) {
-        // 超时场景：尝试从已收集的 stdout 恢复部分输出
-        // （如果是超时路径，treeKill 已在 createTimeout 中调用）
+        // 超时场景：treeKill 已在 createTimeout 中调用
         throw error;
       }
       if (error instanceof Error) {
@@ -176,6 +186,9 @@ export class OpenCodeRunner implements AgentRunner {
       }
       throw new ExecutionError('Unknown error during OpenCode execution', fullCommand);
     } finally {
+      // 取消超时定时器，防止在进程正常结束后误触发 treeKill
+      if (timeoutId) clearTimeout(timeoutId);
+
       // 仅在异常退出时 treeKill（非零 exitCode），避免误杀被 OS 复用的 PID
       if (proc?.pid != null && exitCode !== 0 && exitCode !== null) {
         treeKill(proc.pid);

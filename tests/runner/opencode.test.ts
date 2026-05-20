@@ -96,7 +96,7 @@ describe('OpenCodeRunner', () => {
       expect(spawn).toHaveBeenCalledWith(
         expect.stringContaining('opencode run'),
         expect.any(Array),
-        expect.objectContaining({ shell: true, detached: true })
+        expect.objectContaining({ shell: true, detached: process.platform !== 'win32' })
       );
       expect(result.sessionId).toBe('ses_123');
       expect(processManager.register).toHaveBeenCalledWith(12345);
