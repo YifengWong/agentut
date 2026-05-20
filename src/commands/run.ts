@@ -281,7 +281,7 @@ async function executeScenario(
           }
 
           // Run agent
-          const runResult = runner.run({
+          const runResult = await runner.run({
             input: step.input,
             directory: tempDirectory,
             sessionId,

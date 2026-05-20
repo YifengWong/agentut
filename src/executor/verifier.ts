@@ -2,6 +2,7 @@ import fs from 'fs-extra';
 import * as path from 'path';
 import { spawn } from 'child_process';
 import { createRunner } from '../runner/factory.js';
+import { processManager, treeKill } from '../process/index.js';
 import { OpenCodeDistiller, formatForJudge } from '../distiller/opencode.js';
 import { logger } from '../output/logger.js';
 import {
@@ -497,8 +498,11 @@ async function executeCommand(
     const proc = spawn(command, [], {
       cwd,
       shell: true,
+      detached: true,
       timeout
     });
+
+    processManager.register(proc.pid!);
 
     let stdout = '';
     let stderr = '';
@@ -511,7 +515,12 @@ async function executeCommand(
       stderr += data.toString();
     });
 
-    proc.on('close', (code) => {
+    proc.on('close', (code, signal) => {
+      // If killed by signal (timeout), treeKill to ensure no orphans
+      if (signal) {
+        treeKill(proc.pid!);
+      }
+      processManager.unregister(proc.pid!);
       resolve({
         stdout,
         stderr,
@@ -520,19 +529,9 @@ async function executeCommand(
     });
 
     proc.on('error', (err) => {
+      treeKill(proc.pid!);
+      processManager.unregister(proc.pid!);
       reject(err);
-    });
-
-    // 超时处理：spawn 的 timeout 会自动终止进程
-    // 但我们需要捕获这个事件
-    proc.on('exit', (code, signal) => {
-      if (signal === 'SIGTERM') {
-        resolve({
-          stdout,
-          stderr,
-          exitCode: 1
-        });
-      }
     });
   });
 }
@@ -700,7 +699,7 @@ export async function verifyJudgedBy(
   const timeout = assertion.timeout || defaultTimeout;
 
   try {
-    const result = runner.run({
+    const result = await runner.run({
       input: combinedPrompt,
       directory: judgeDir,
       timeout,
@@ -795,7 +794,7 @@ export async function evaluateScenarioScore(
 
   try {
     const runner = createRunner(judgeConfig);
-    const result = runner.run({
+    const result = await runner.run({
       input: combinedPrompt,
       directory: workDir,
       timeout,

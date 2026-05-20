@@ -2,7 +2,8 @@ import fs from 'fs-extra';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { fileURLToPath } from 'url';
-import { execSync } from 'child_process';
+import { spawn } from 'child_process';
+import { processManager, treeKill } from '../process/index.js';
 import { SetupError, ValidationError, type EnvironmentConfig, type SetupAction, type GlobalConfig, type CleanupResult } from '../types/index.js';
 import type { MockRule } from '../types/index.js';
 import { logger } from '../output/logger.js';
@@ -125,13 +126,55 @@ export async function executeSetup(
       }
 
       try {
-        execSync(action.run, {
-          cwd: workDir,
-          encoding: 'utf-8',
-          timeout: 60000,
-          stdio: 'pipe'
+        await new Promise<void>((resolve, reject) => {
+          const proc = spawn(action.run!, [], {
+            cwd: workDir,
+            shell: true,
+            detached: true,
+            stdio: 'pipe'
+          });
+
+          processManager.register(proc.pid!);
+
+          let stderr = '';
+          proc.stderr?.on('data', (data) => {
+            stderr += data.toString();
+          });
+
+          const timeoutId = setTimeout(() => {
+            treeKill(proc.pid!);
+            processManager.unregister(proc.pid!);
+            reject(new SetupError(
+              `Setup command timed out after 60s: ${action.run}`,
+              action
+            ));
+          }, 60000);
+
+          proc.on('close', (code) => {
+            clearTimeout(timeoutId);
+            processManager.unregister(proc.pid!);
+            if (code === 0) {
+              resolve();
+            } else {
+              reject(new SetupError(
+                `Setup command failed with exit code ${code}: ${action.run}${stderr ? `\n${stderr}` : ''}`,
+                action
+              ));
+            }
+          });
+
+          proc.on('error', (err) => {
+            clearTimeout(timeoutId);
+            treeKill(proc.pid!);
+            processManager.unregister(proc.pid!);
+            reject(new SetupError(
+              `Setup command failed: ${err.message}`,
+              action
+            ));
+          });
         });
       } catch (error) {
+        if (error instanceof SetupError) throw error;
         throw new SetupError(
           `Setup command failed: ${action.run}`,
           action
