@@ -58,7 +58,28 @@ scenarios:
               command: "node -v"
               expect: { contains: "24" }
 
-  # 场景 3：多步骤串联（先创建再读取）
+  # 场景 3：验证 should_not_call_tool 断言
+  - name: should-not-call
+    environment: with-hello
+    cleanup: true
+    steps:
+      - input: "使用 'file-operations' 技能，读取 hello.txt 文件内容"
+        expected:
+          - should_call_tool: Read
+          - should_call_tool:
+              name: Skill
+              input:
+                name: { equals: "file-operations" }
+              status: completed
+          # 简单格式：读取文件不应调用 Bash
+          - should_not_call_tool: Bash
+          # 详细格式：不应激活 debugging 相关 Skill
+          - should_not_call_tool:
+              name: Skill
+              input:
+                name: { regex: ".*debugging.*" }
+              status: completed
+
   - name: create-then-read
     environment: empty
     cleanup: true

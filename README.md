@@ -192,11 +192,12 @@ opencode export ses_xxx > .agentut/sessions/base-session.json
 
 ### 断言速查表
 
-Agent UT 支持 6 种断言类型：
+Agent UT 支持 7 种断言类型：
 
 | 断言类型 | 参数格式 | 验证内容 |
 |----------|----------|----------|
 | `should_call_tool` | 字符串或 ToolCallAssertion 对象 | 验证 Agent 调用了指定工具 |
+| `should_not_call_tool` | 字符串或 ToolCallAssertion 对象 | 验证 Agent **未**调用指定工具 |
 | `should_produce_file` | 字符串或 Matcher | 验证工作目录中产生了指定文件 |
 | `file_content_contains` | `{ file, text }` 或 FileContentAssertion | 验证文件内容包含指定文本 |
 | `response_contains` | 字符串或 Matcher | 验证 Agent 文本响应包含指定内容 |
@@ -264,6 +265,34 @@ expected:
 | `output` | string \| Matcher | 匹配工具执行结果输出 |
 | `status` | `'completed' \| 'error' \| 'pending'` | 匹配工具执行状态 |
 | `min_pass` | number | 概率测试：断言级最小通过次数 |
+
+### should_not_call_tool
+
+验证 Agent **未**调用指定工具或技能。与 `should_call_tool` 完全对称，语义相反 — 只要匹配到任何工具调用，断言即失败。
+
+```yaml
+expected:
+  # 简单格式：禁止调用 Bash
+  - should_not_call_tool: Bash
+
+  # 详细格式：禁止激活特定 Skill
+  - should_not_call_tool:
+      name: Skill
+      input:
+        name: debugging
+      status: completed
+
+  # Matcher 组合：禁止调用任何名称匹配的 Skill
+  - should_not_call_tool:
+      name: Skill
+      input:
+        name: { regex: ".*debugging.*" }
+```
+
+**使用场景：**
+- 验证某操作未引入不期望的工具调用（如确保纯内存操作不涉及 Write）
+- 验证 Skill 隔离性（如确保 file-operations skill 不触发 debugging skill）
+- 回归测试保证（如确保重构后不再使用废弃的工具）
 
 ### should_produce_file
 
@@ -641,7 +670,7 @@ agentut suggest --latest --base config.yaml -o tests/my-test.yaml
 运行测试用例，最核心的命令。
 
 ```bash
-agentut run <testFile> [-f format] [-o file] [-s scenario] [--clean]
+agentut run <testFile> [-f format] [-o file] [-s scenario ...] [--clean]
 ```
 
 **选项**：
@@ -650,7 +679,7 @@ agentut run <testFile> [-f format] [-o file] [-s scenario] [--clean]
 |------|------|
 | `-f, --format <format>` | 输出格式 (json, markdown, html, jest)，默认 json |
 | `-o, --output <file>` | 输出到文件 |
-| `-s, --scenario <name>` | 只运行指定场景 |
+| `-s, --scenario <name>` | 只运行指定场景（可重复传入） |
 | `--parallel` | 并行运行场景 |
 | `-m, --model <model>` | 覆盖模型配置 |
 | `-a, --agent <agent>` | 覆盖 agent 配置 |

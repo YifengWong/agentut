@@ -48,6 +48,7 @@ export function calculateStepSummary(
  */
 function getAssertionType(assertion: Assertion): string {
   if ('should_call_tool' in assertion) return 'should_call_tool';
+  if ('should_not_call_tool' in assertion) return 'should_not_call_tool';
   if ('should_produce_file' in assertion) return 'should_produce_file';
   if ('file_content_contains' in assertion) return 'file_content_contains';
   if ('response_contains' in assertion) return 'response_contains';
@@ -61,6 +62,7 @@ function getAssertionType(assertion: Assertion): string {
  */
 function getAssertionValue(assertion: Assertion): string | Matcher | ToolCallAssertion | FileContentAssertion | JudgedByAssertion | ExecCommandAssertion | { file: string; text: string } | undefined {
   if ('should_call_tool' in assertion) return assertion.should_call_tool as string | ToolCallAssertion;
+  if ('should_not_call_tool' in assertion) return assertion.should_not_call_tool as string | ToolCallAssertion;
   if ('should_produce_file' in assertion) return assertion.should_produce_file as string | Matcher;
   if ('file_content_contains' in assertion) return assertion.file_content_contains as FileContentAssertion | { file: string; text: string };
   if ('response_contains' in assertion) return assertion.response_contains as string | Matcher;
@@ -84,9 +86,17 @@ function getAssertionMinPass(assertion: Assertion, defaultMinPass: number): numb
     }
   }
 
-  // 检查 ToolCallAssertion 内部的 min_pass
+  // 检查 ToolCallAssertion 内部的 min_pass（should_call_tool）
   if ('should_call_tool' in assertion && typeof assertion.should_call_tool === 'object' && assertion.should_call_tool !== null) {
     const toolCall = assertion.should_call_tool as ToolCallAssertion;
+    if (toolCall.min_pass !== undefined && toolCall.min_pass !== null) {
+      return toolCall.min_pass;
+    }
+  }
+
+  // 检查 ToolCallAssertion 内部的 min_pass（should_not_call_tool）
+  if ('should_not_call_tool' in assertion && typeof assertion.should_not_call_tool === 'object' && assertion.should_not_call_tool !== null) {
+    const toolCall = assertion.should_not_call_tool as ToolCallAssertion;
     if (toolCall.min_pass !== undefined && toolCall.min_pass !== null) {
       return toolCall.min_pass;
     }
