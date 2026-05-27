@@ -78,7 +78,8 @@ program
   .description('Run test cases')
   .option('-f, --format <format>', 'Output format (json, markdown, html, jest)', 'json')
   .option('-o, --output <file>', 'Output file path')
-  .option('-s, --scenario <name>', 'Run specific scenario')
+  .option('-s, --scenario <name>', 'Run specific scenario (repeatable)',
+    (val: string, prev: string[]) => [...prev, val], [])
   .option('--parallel', 'Run scenarios in parallel')
   .option('-m, --model <model>', 'Override model (provider/model)')
   .option('-a, --agent <agent>', 'Override agent')

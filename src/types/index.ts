@@ -122,6 +122,7 @@ export interface ExecCommandAssertion {
 
 export type Assertion =
   | { should_call_tool: string | ToolCallAssertion }
+  | { should_not_call_tool: string | ToolCallAssertion }
   | { should_produce_file: string | Matcher }
   | { file_content_contains: { file: string; text: string } | FileContentAssertion }
   | { response_contains: string | Matcher }

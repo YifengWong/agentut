@@ -27,7 +27,7 @@ import {
 } from '../types/index.js';
 
 export interface RunOptions {
-  scenario?: string;
+  scenario?: string | string[];
   format?: 'json' | 'markdown' | 'html' | 'jest';
   output?: string;
   parallel?: boolean;
@@ -58,9 +58,13 @@ export async function runTests(
   // Filter scenarios if specified
   let scenarios = suite.scenarios;
   if (options.scenario) {
-    scenarios = scenarios.filter(s => s.name === options.scenario);
+    const scenarioNames = Array.isArray(options.scenario)
+      ? options.scenario
+      : [options.scenario];
+    scenarios = scenarios.filter(s => scenarioNames.includes(s.name));
     if (scenarios.length === 0) {
-      throw new ExecutionError(`Scenario not found: ${options.scenario}`, testPath);
+      const names = scenarioNames.join(', ');
+      throw new ExecutionError(`Scenario(s) not found: ${names}`, testPath);
     }
   }
 

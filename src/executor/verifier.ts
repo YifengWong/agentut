@@ -417,6 +417,41 @@ export function verifyResponseContains(
 }
 
 /**
+ * Verify that a specific tool was NOT called (inverse of should_call_tool)
+ * Supports the same matching capabilities as should_call_tool
+ */
+export function verifyShouldNotCallTool(
+  outputs: OpenCodeRunOutput[],
+  assertion: string | ToolCallAssertion
+): AssertionResult {
+  // 复用 should_call_tool 的匹配逻辑
+  const positiveResult = verifyShouldCallTool(outputs, assertion);
+
+  const toolAssertion: ToolCallAssertion = typeof assertion === 'string'
+    ? { name: assertion }
+    : assertion;
+
+  const nameDesc = getMatcherDescription(toolAssertion.name);
+  const inputDesc = toolAssertion.input
+    ? Object.entries(toolAssertion.input)
+        .map(([k, v]) => `${k} ${getMatcherDescription(v)}`)
+        .join(', ')
+    : '';
+  const statusDesc = toolAssertion.status ? `, status='${toolAssertion.status}'` : '';
+  const outputDesc = toolAssertion.output ? `, output ${getMatcherDescription(toolAssertion.output)}` : '';
+
+  return {
+    type: 'should_not_call_tool',
+    value: toolAssertion,
+    passed: !positiveResult.passed,
+    actual: positiveResult.actual,
+    message: !positiveResult.passed
+      ? `No unexpected tool call found for ${nameDesc}${inputDesc ? `, input ${inputDesc}` : ''}${statusDesc}${outputDesc}`
+      : `Unexpected tool call found: ${positiveResult.actual?.tool}${inputDesc ? `(${inputDesc})` : ''}${statusDesc}${outputDesc}`
+  };
+}
+
+/**
  * Verify all assertions against outputs and working directory
  */
 export async function verifyAssertions(
@@ -434,6 +469,10 @@ export async function verifyAssertions(
   for (const assertion of assertions) {
     if ('should_call_tool' in assertion) {
       results.push(verifyShouldCallTool(outputs, assertion.should_call_tool));
+    }
+
+    if ('should_not_call_tool' in assertion) {
+      results.push(verifyShouldNotCallTool(outputs, assertion.should_not_call_tool));
     }
 
     if ('should_produce_file' in assertion) {
