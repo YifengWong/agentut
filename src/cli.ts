@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import fs from 'fs-extra';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { initProject } from './commands/init.js';
 import { suggestTest } from './commands/suggest.js';
 import { runTests } from './commands/run.js';
@@ -10,12 +12,15 @@ import { formatAsMarkdown } from './output/formatters/markdown.js';
 import { formatAsHtml } from './output/formatters/html.js';
 import { formatAsJest } from './output/formatters/jest.js';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = fs.readJsonSync(join(__dirname, '..', 'package.json'));
+
 const program = new Command();
 
 program
   .name('agentut')
   .description('Agent UT - Test framework for Agent behaviors')
-  .version('1.0.0');
+  .version(pkg.version);
 
 // init command
 program
