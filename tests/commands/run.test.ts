@@ -517,6 +517,154 @@ describe('run command', () => {
         fork: true
       }));
     });
+
+    it('should pass scenario run_args to runner.run when step has no run_args', async () => {
+      const mockSuite: YamlTestSuite = {
+        name: 'test',
+        environments: { default: { directory: './test', setup: [] } },
+        scenarios: [{
+          name: 'scenario-with-args',
+          environment: 'default',
+          cleanup: true,
+          run_args: '--verbose',
+          steps: [{
+            input: 'Test',
+            expected: [],
+            timeout: 60000
+          }]
+        }],
+        config: {
+          agent_cli: { runner: 'opencode', command: 'opencode' }
+        }
+      };
+
+      vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
+      vi.mocked(prepareEnvironment).mockResolvedValue({ tempDirectory: '/tmp/test' });
+      mockRunner.run.mockReturnValue({
+        outputs: [],
+        sessionId: 'ses_1'
+      });
+
+      const yamlPath = path.join(TEST_DIR, 'test.yaml');
+      await fs.writeFile(yamlPath, 'name: test');
+
+      await runTests(yamlPath);
+
+      expect(mockRunner.run).toHaveBeenCalledWith(expect.objectContaining({
+        runArgs: '--verbose'
+      }));
+    });
+
+    it('should pass step run_args to runner.run when scenario has no run_args', async () => {
+      const mockSuite: YamlTestSuite = {
+        name: 'test',
+        environments: { default: { directory: './test', setup: [] } },
+        scenarios: [{
+          name: 'step-with-args',
+          environment: 'default',
+          cleanup: true,
+          steps: [{
+            input: 'Test',
+            expected: [],
+            timeout: 60000,
+            run_args: '--command "my-cmd"'
+          }]
+        }],
+        config: {
+          agent_cli: { runner: 'opencode', command: 'opencode' }
+        }
+      };
+
+      vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
+      vi.mocked(prepareEnvironment).mockResolvedValue({ tempDirectory: '/tmp/test' });
+      mockRunner.run.mockReturnValue({
+        outputs: [],
+        sessionId: 'ses_1'
+      });
+
+      const yamlPath = path.join(TEST_DIR, 'test.yaml');
+      await fs.writeFile(yamlPath, 'name: test');
+
+      await runTests(yamlPath);
+
+      expect(mockRunner.run).toHaveBeenCalledWith(expect.objectContaining({
+        runArgs: '--command "my-cmd"'
+      }));
+    });
+
+    it('should merge scenario and step run_args (scenario first, space-separated)', async () => {
+      const mockSuite: YamlTestSuite = {
+        name: 'test',
+        environments: { default: { directory: './test', setup: [] } },
+        scenarios: [{
+          name: 'merged-args',
+          environment: 'default',
+          cleanup: true,
+          run_args: '--verbose',
+          steps: [{
+            input: 'Test',
+            expected: [],
+            timeout: 60000,
+            run_args: '--command "my-cmd"'
+          }]
+        }],
+        config: {
+          agent_cli: { runner: 'opencode', command: 'opencode' }
+        }
+      };
+
+      vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
+      vi.mocked(prepareEnvironment).mockResolvedValue({ tempDirectory: '/tmp/test' });
+      mockRunner.run.mockReturnValue({
+        outputs: [],
+        sessionId: 'ses_1'
+      });
+
+      const yamlPath = path.join(TEST_DIR, 'test.yaml');
+      await fs.writeFile(yamlPath, 'name: test');
+
+      await runTests(yamlPath);
+
+      expect(mockRunner.run).toHaveBeenCalledWith(expect.objectContaining({
+        runArgs: '--verbose --command "my-cmd"'
+      }));
+    });
+
+    it('should pass undefined runArgs when neither scenario nor step has run_args', async () => {
+      const mockSuite: YamlTestSuite = {
+        name: 'test',
+        environments: { default: { directory: './test', setup: [] } },
+        scenarios: [{
+          name: 'no-args',
+          environment: 'default',
+          cleanup: true,
+          steps: [{
+            input: 'Test',
+            expected: [],
+            timeout: 60000
+          }]
+        }],
+        config: {
+          agent_cli: { runner: 'opencode', command: 'opencode' }
+        }
+      };
+
+      vi.mocked(parseAndValidateYaml).mockReturnValue(mockSuite);
+      vi.mocked(prepareEnvironment).mockResolvedValue({ tempDirectory: '/tmp/test' });
+      mockRunner.run.mockReturnValue({
+        outputs: [],
+        sessionId: 'ses_1'
+      });
+
+      const yamlPath = path.join(TEST_DIR, 'test.yaml');
+      await fs.writeFile(yamlPath, 'name: test');
+
+      await runTests(yamlPath);
+
+      expect(mockRunner.run).toHaveBeenCalledWith(expect.objectContaining({
+        runArgs: undefined
+      }));
+    });
   });
 
   // Probabilistic test execution tests

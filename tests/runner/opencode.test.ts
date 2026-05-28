@@ -265,6 +265,36 @@ describe('OpenCodeRunner', () => {
       );
     });
 
+    it('should append runArgs to the command when provided', async () => {
+      vi.mocked(spawn).mockReturnValue(createMockProcess('{}'));
+
+      await runner.run({
+        input: 'Test',
+        runArgs: '--verbose --command "my-cmd"'
+      });
+
+      expect(spawn).toHaveBeenCalledWith(
+        expect.stringContaining('--verbose --command "my-cmd"'),
+        expect.any(Array),
+        expect.any(Object)
+      );
+    });
+
+    it('should not include runArgs in the command when not provided', async () => {
+      vi.mocked(spawn).mockReturnValue(createMockProcess('{}'));
+
+      await runner.run({
+        input: 'Test',
+        directory: '/test'
+      });
+
+      const call = vi.mocked(spawn).mock.calls[0][0] as string;
+      // Should contain the basic args but NOT any "runArgs" or extra custom flags
+      expect(call).toContain('opencode run');
+      expect(call).toContain('--format json');
+      expect(call).not.toContain('--verbose');
+    });
+
     it('should quote model value with special characters', async () => {
       vi.mocked(spawn).mockReturnValue(createMockProcess('{}'));
 
