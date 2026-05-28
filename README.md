@@ -13,6 +13,7 @@ Agent UT 是一个为 AI Agent 工程提供单元测试能力的 TypeScript CLI 
 - [导入初始会话](#导入初始会话-initial_session)
 - [断言系统](#断言系统)
 - [Mock 功能](#mock-功能)
+- [自定义 CLI 参数](#自定义-cli-参数-run_args)
 - [场景评分](#场景评分)
 - [概率性测试](#概率性测试)
 - [Agent CLI 配置](#agent-cli-配置)
@@ -486,6 +487,41 @@ opencode 启动:
 ### 校验提示
 
 Agent UT 在步骤执行后自动检查 mock 配置是否实际生效。若发现 mock 配置了但从未命中，或命中但实际 output/error 与配置不一致，会输出 `⚠ warning` 日志。Warning 不影响测试结果，仅作为诊断辅助。
+
+## 自定义 CLI 参数 (run_args)
+
+`run_args` 字段支持在 Scenario 或 Step 级别向 opencode 命令追加自定义 CLI 参数。
+
+### 作用域
+
+- **Scenario 级别**：该场景的所有 steps 都会追加此参数
+- **Step 级别**：仅当前 step 追加此参数
+- **合并规则**：Scenario 和 Step 都配置时，拼接合并（Scenario 在前，Step 在后）
+
+### 示例
+
+```yaml
+scenarios:
+  - name: custom-command-test
+    environment: default
+    run_args: '--verbose'                       # Scenario 级别
+    steps:
+      - input: "创建文件"
+        run_args: '--command "my-command"'      # Step 级别，与 Scenario 拼接
+        expected:
+          - should_call_tool: Write
+```
+
+实际生成的命令：
+```
+opencode run "创建文件" --dir "..." --format json --model "..." --verbose --command "my-command"
+```
+
+### 注意事项
+
+- `run_args` 是透明透传的 opaque 字符串，不做格式校验
+- 用户需通过 YAML 语法自行控制引号（如单引号包裹含双引号的值）
+- 不做参数去重
 
 ## 场景评分
 

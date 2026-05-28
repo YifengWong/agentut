@@ -26,6 +26,7 @@ export interface RunOptions {
   model?: string;
   agent?: string;
   file?: string;  // -f 参数，传递附加文件路径（用于 AI Judge 断言）
+  runArgs?: string;  // 附加 CLI 参数，追加到 agent 命令末尾
 }
 
 /**

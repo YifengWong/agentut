@@ -284,6 +284,11 @@ async function executeScenario(
             await injectMockPlugin(tempDirectory, step.mock);
           }
 
+          // Merge run_args: scenario + step (Scenario first, space-separated)
+          const mergedRunArgs = [scenario.run_args, step.run_args]
+            .filter(Boolean)
+            .join(' ') || undefined;
+
           // Run agent
           const runResult = await runner.run({
             input: step.input,
@@ -292,7 +297,8 @@ async function executeScenario(
             fork: !!sessionId,
             timeout: step.timeout,
             model,
-            agent
+            agent,
+            runArgs: mergedRunArgs
           });
 
           sessionId = runResult.sessionId;

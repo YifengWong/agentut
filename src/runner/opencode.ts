@@ -116,6 +116,11 @@ export class OpenCodeRunner implements AgentRunner {
       args.push(`--agent "${options.agent}"`);
     }
 
+    // Add custom run args (opaque string from scenario/step config)
+    if (options.runArgs) {
+      args.push(options.runArgs);
+    }
+
     const fullCommand = args.join(' ');
     const timeout = options.timeout || 120000;
 

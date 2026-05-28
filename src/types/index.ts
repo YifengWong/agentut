@@ -29,6 +29,7 @@ export interface ScenarioConfig {
   min_pass?: number;  // 概率测试：覆盖全局设置
   initial_session?: string;  // session 文件路径（相对于 YAML 文件所在目录）
   score?: ScoreConfig;  // 可选，所有字段有默认值
+  run_args?: string;    // 传递给 agent CLI 的自定义参数
 }
 
 export interface ScoreConfig {
@@ -59,6 +60,7 @@ export interface StepConfig {
   expected: Assertion[];
   timeout?: number;
   mock?: MockRule[];
+  run_args?: string;    // 传递给 agent CLI 的自定义参数
 }
 
 // ========== Matcher Types ==========
