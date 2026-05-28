@@ -57,7 +57,7 @@ export async function runTests(
 
   // Filter scenarios if specified
   let scenarios = suite.scenarios;
-  if (options.scenario) {
+  if (options.scenario && options.scenario.length > 0) {
     const scenarioNames = Array.isArray(options.scenario)
       ? options.scenario
       : [options.scenario];
